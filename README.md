@@ -14,3 +14,28 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Live API (MongoDB)
+
+This project now includes a small Express API backed by MongoDB to drive live dashboard updates.
+
+1. Start MongoDB locally (or set `MONGODB_URI` to your hosted instance).
+2. Install dependencies: `npm install`
+3. Run the API: `npm run server`
+4. Run the frontend: `npm run dev`
+
+The UI polls `http://localhost:3001/api/dashboard` every 5 seconds. Override with `VITE_API_BASE_URL` if needed.
+
+### Postman demo
+
+`POST http://localhost:3001/api/transactions`
+
+Body (JSON):
+```
+{
+  "timeframe": "week",
+  "vendor": "Frontier",
+  "type": "byo",
+  "amount": 5
+}
+```

@@ -4,16 +4,21 @@ import {
   Tooltip as RechartsTooltip, ResponsiveContainer,
   BarChart, Bar, Legend, PieChart, Pie, Cell
 } from 'recharts';
-import { appData, vendorDrillDownData, studentData, COLORS } from './data.js';
+import { COLORS } from './data.js';
 
-export default function MobileApp({ onBack }) {
+export default function MobileApp({ onBack, data, status }) {
   const [viewRole, setViewRole] = useState('stakeholder');
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [timeframe, setTimeframe] = useState('week');
 
+  const { appData, vendorDrillDownData, studentData } = data;
   const activeMacro = appData[timeframe];
   const activeStudent = studentData[timeframe];
   const activeDrillDown = selectedVendor ? vendorDrillDownData[timeframe][selectedVendor] : [];
+
+  const lastUpdatedLabel = status?.lastUpdated
+    ? new Date(status.lastUpdated).toLocaleTimeString()
+    : null;
 
   const handleVendorClick = (data) => {
     if (data && data.name) setSelectedVendor(data.name);
@@ -41,6 +46,10 @@ export default function MobileApp({ onBack }) {
         <div className="flex flex-col items-center">
           <span className="text-sm font-bold text-green-400 leading-tight">ZeroWasteNUS</span>
           <span className="text-xs text-slate-400">{getTitle()}</span>
+          <span className={`text-[10px] mt-0.5 ${status?.error ? 'text-red-400' : status?.loading ? 'text-amber-300' : 'text-emerald-300'}`}>
+            {status?.error ? 'Live sync error' : status?.loading ? 'Connecting' : 'Live sync'}
+            {!status?.error && lastUpdatedLabel ? ` • ${lastUpdatedLabel}` : ''}
+          </span>
         </div>
 
         {/* Timeframe toggle */}

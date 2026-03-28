@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
-import { appData, vendorDrillDownData, studentData, COLORS } from './data.js';
+import { COLORS } from './data.js';
+import { useDashboardData } from './useDashboardData.js';
 import MobileApp from './MobileApp.jsx';
 
 // ==========================================
@@ -11,11 +12,13 @@ export default function ZeroWasteDashboard() {
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [timeframe, setTimeframe] = useState('week');
   const [showMobile, setShowMobile] = useState(false);
+  const { data, status } = useDashboardData();
+  const { appData, vendorDrillDownData, studentData } = data;
 
   if (showMobile) {
     return (
       <div className="h-screen">
-        <MobileApp onBack={() => setShowMobile(false)} />
+        <MobileApp onBack={() => setShowMobile(false)} data={data} status={status} />
       </div>
     );
   }
@@ -25,6 +28,10 @@ export default function ZeroWasteDashboard() {
   const activeStudent = studentData[timeframe];
   // Dynamically pull the correct drill-down data (e.g. Frontier's Hourly vs Frontier's Daily)
   const activeDrillDown = selectedVendor ? vendorDrillDownData[timeframe][selectedVendor] : [];
+
+  const lastUpdatedLabel = status.lastUpdated
+    ? new Date(status.lastUpdated).toLocaleTimeString()
+    : null;
 
   // Click Handler for Vendor Bars
   const handleVendorClick = (data) => {
@@ -88,6 +95,16 @@ export default function ZeroWasteDashboard() {
               >
                 This Month
               </button>
+            </div>
+            <div
+              className={`flex items-center text-xs font-medium ${status.error ? 'text-red-600' : status.loading ? 'text-amber-600' : 'text-green-600'}`}
+              title={status.error || 'Live data connected'}
+            >
+              <span className={`w-2 h-2 rounded-full mr-2 ${status.error ? 'bg-red-500' : status.loading ? 'bg-amber-500' : 'bg-green-500'} animate-pulse`}></span>
+              {status.error ? 'Live sync error' : status.loading ? 'Connecting live data' : 'Live sync'}
+              {!status.error && lastUpdatedLabel ? (
+                <span className="ml-2 text-gray-400">Updated {lastUpdatedLabel}</span>
+              ) : null}
             </div>
             <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">AY2025/2026</span>
             <button
