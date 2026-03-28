@@ -19,10 +19,17 @@ If you are developing a production application, we recommend using TypeScript wi
 
 This project now includes a small Express API backed by MongoDB to drive live dashboard updates.
 
-1. Start MongoDB locally (or set `MONGODB_URI` to your hosted instance).
+### Option A: Local MongoDB
+1. Start MongoDB locally.
 2. Install dependencies: `npm install`
 3. Run the API: `npm run server`
 4. Run the frontend: `npm run dev`
+
+### Option B: MongoDB Atlas (recommended for multi-device)
+1. Create a free Atlas cluster and user.
+2. Copy `.env.example` to `.env`.
+3. Paste your Atlas connection string into `MONGODB_URI` in `.env`.
+4. Run: `npm install` then `npm run server` and `npm run dev`.
 
 The UI polls `http://localhost:3001/api/dashboard` every 5 seconds. Override with `VITE_API_BASE_URL` if needed.
 
