@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import crypto from 'crypto';
 import { MongoClient } from 'mongodb';
 import { appData as seedAppData, vendorDrillDownData as seedVendorDrillDownData, studentData as seedStudentData } from '../src/data.js';
 
@@ -11,7 +12,19 @@ app.use(cors());
 app.use(express.json());
 
 const client = new MongoClient(MONGODB_URI);
-let collectionPromise;
+let dbPromise;
+
+const getDb = () => {
+  if (!dbPromise) {
+    dbPromise = client.connect().then(() => client.db());
+  }
+  return dbPromise;
+};
+
+const getCollection = async (name) => {
+  const db = await getDb();
+  return db.collection(name);
+};
 
 const deepClone = (value) => {
   if (typeof structuredClone === 'function') {
@@ -20,14 +33,8 @@ const deepClone = (value) => {
   return JSON.parse(JSON.stringify(value));
 };
 
-const getCollection = () => {
-  if (!collectionPromise) {
-    collectionPromise = client.connect().then(() => client.db().collection('dashboard'));
-  }
-  return collectionPromise;
-};
 
-const buildSeed = () => ({
+const buildSeedDashboard = () => ({
   appData: deepClone(seedAppData),
   vendorDrillDownData: deepClone(seedVendorDrillDownData),
   studentData: deepClone(seedStudentData)
@@ -35,18 +42,16 @@ const buildSeed = () => ({
 
 const stripId = ({ _id, ...rest }) => rest;
 
-const ensureSeed = async () => {
-  const collection = await getCollection();
-  const existing = await collection.findOne({ _id: 'dashboard' });
-  if (existing) {
-    return existing;
-  }
+const ensureSeedDashboard = async () => {
+  const dashboards = await getCollection('dashboards');
+  const existing = await dashboards.findOne({ _id: 'seed' });
+  if (existing) return existing;
   const seed = {
-    _id: 'dashboard',
-    ...buildSeed(),
+    _id: 'seed',
+    ...buildSeedDashboard(),
     updatedAt: new Date()
   };
-  await collection.insertOne(seed);
+  await dashboards.insertOne(seed);
   return seed;
 };
 
@@ -56,28 +61,39 @@ const parseMoney = (value) => Number(String(value).replace(/[^0-9.]/g, '')) || 0
 const formatMoney = (value) => `$${value.toFixed(2)}`;
 
 const normalizeTransaction = (payload) => {
-  const timeframe = payload?.timeframe;
-  const vendor = payload?.vendor;
-  const type = payload?.type;
-  const amount = Number(payload?.amount ?? 1);
+  const cupMode = payload?.cup_mode;
+  const outletId = payload?.outlet_id;
+  const stallId = payload?.stall_id || null;
+  const campusZone = payload?.campus_zone || null;
+  const channel = payload?.channel || 'walk-up';
+  const drinkCategory = payload?.drink_category || null;
+  const price = typeof payload?.price === 'number' ? payload.price : null;
+  const disposableFeeApplied = payload?.disposable_fee_applied ?? null;
+  const incentiveApplied = payload?.incentive_applied ?? null;
+  const userHash = payload?.user_hash || null;
+  const timestamp = payload?.timestamp ? new Date(payload.timestamp) : new Date();
 
-  const validTimeframes = new Set(['week', 'month']);
-  const validTypes = new Set(['byo', 'rental', 'disposable']);
+  const validCupModes = new Set(['disposable', 'BYO', 'rental']);
 
-  if (!validTimeframes.has(timeframe)) {
-    return { error: 'timeframe must be "week" or "month".' };
-  }
-  if (!validTypes.has(type)) {
-    return { error: 'type must be "byo", "rental", or "disposable".' };
-  }
-  if (!vendor || typeof vendor !== 'string') {
-    return { error: 'vendor is required.' };
-  }
-  if (!Number.isFinite(amount) || amount <= 0 || amount > 500) {
-    return { error: 'amount must be a positive number up to 500.' };
+  if (!outletId) return { error: 'outlet_id is required.' };
+  if (!campusZone) return { error: 'campus_zone is required.' };
+  if (!cupMode || !validCupModes.has(cupMode)) {
+    return { error: 'cup_mode must be one of "disposable", "BYO", "rental".' };
   }
 
-  return { timeframe, vendor, type, amount };
+  return {
+    timestamp,
+    outlet_id: outletId,
+    stall_id: stallId,
+    campus_zone: campusZone,
+    channel,
+    cup_mode: cupMode,
+    drink_category: drinkCategory,
+    price,
+    disposable_fee_applied: disposableFeeApplied,
+    incentive_applied: incentiveApplied,
+    user_hash: userHash
+  };
 };
 
 const ensureShareCounts = (macro) => {
@@ -147,50 +163,88 @@ const updateStudentKpis = (student, type, amount) => {
   student.kpis.diverted = `${Math.max(0, Math.round(diverted))}`;
 };
 
-const applyTransaction = (dashboard, { timeframe, vendor, type, amount }) => {
-  const macro = dashboard.appData?.[timeframe];
-  const vendorMacro = macro?.vendor?.find(
-    (row) => row.name.toLowerCase() === vendor.toLowerCase()
-  );
-  const vendorKey = vendorMacro?.name;
-  const trend = macro?.trend?.[macro.trend.length - 1];
-  const drillDown = vendorKey ? dashboard.vendorDrillDownData?.[timeframe]?.[vendorKey] : null;
-  const drillLast = drillDown?.[drillDown.length - 1];
-  const student = dashboard.studentData?.[timeframe];
-  const studentLast = student?.chart?.[student.chart.length - 1];
+const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
+  const dashboard = deepClone(seed);
 
-  if (!macro || !vendorMacro || !trend || !drillLast || !student || !studentLast) {
-    throw new Error('Dashboard seed data is missing required structures.');
+  const classifyTimeframe = (timestamp, now) => {
+    const msDiff = now - timestamp;
+    const days = msDiff / (1000 * 60 * 60 * 24);
+    if (days <= 7) return 'week';
+    if (days <= 31) return 'month';
+    return null;
+  };
+
+  const now = new Date();
+
+  const mapCupModeToType = (cupMode) => {
+    if (!cupMode) return null;
+    if (cupMode === 'BYO') return 'byo';
+    if (cupMode === 'rental') return 'rental';
+    if (cupMode === 'disposable') return 'disposable';
+    return null;
+  };
+
+  for (const tx of transactions) {
+    const timeframe = classifyTimeframe(new Date(tx.timestamp), now);
+    if (!timeframe) continue;
+    const type = mapCupModeToType(tx.cup_mode);
+    if (!type) continue;
+
+    const macro = dashboard.appData?.[timeframe];
+    if (!macro) continue;
+
+    const outletName = tx.outlet_id;
+    const vendorMacro = macro.vendor.find((v) => v.name === outletName) || macro.vendor[0];
+    const vendorKey = vendorMacro.name;
+
+    const macroTrend = macro.trend[macro.trend.length - 1];
+    const drill = dashboard.vendorDrillDownData?.[timeframe]?.[vendorKey];
+    const drillLast = drill?.[drill.length - 1];
+    const student = dashboard.studentData?.[timeframe];
+    const studentLast = student?.chart?.[student.chart.length - 1];
+
+    if (!macroTrend || !drillLast || !studentLast) continue;
+
+    const amount = 1;
+    const macroKey = type === 'byo' ? 'personal' : type;
+    macroTrend[macroKey] = (macroTrend[macroKey] || 0) + amount;
+
+    if (type === 'byo' || type === 'rental') {
+      vendorMacro[type] = (vendorMacro[type] || 0) + amount;
+    }
+
+    drillLast[type] = (drillLast[type] || 0) + amount;
+    studentLast[type] = (studentLast[type] || 0) + amount;
+
+    if (type === 'rental') {
+      macro.kpis.rental = formatCount(parseCount(macro.kpis.rental) + amount);
+    }
+    if (type === 'disposable') {
+      macro.kpis.disp = formatCount(parseCount(macro.kpis.disp) + amount);
+    }
+
+    updateShareAndReuse(macro, type, amount);
+    updateCarbon(macro, type, amount);
+    updateStudentKpis(student, type, amount);
   }
 
-  const macroKey = type === 'byo' ? 'personal' : type;
-  trend[macroKey] = (trend[macroKey] || 0) + amount;
+  // Cup lifecycle events could further adjust KPIs later (e.g. returns, wash lag)
+  // For this demo, they are stored for drill-down but not yet altering the top-line charts.
 
-  if (type === 'byo' || type === 'rental') {
-    vendorMacro[type] = (vendorMacro[type] || 0) + amount;
-  }
-
-  drillLast[type] = (drillLast[type] || 0) + amount;
-  studentLast[type] = (studentLast[type] || 0) + amount;
-
-  if (type === 'rental') {
-    macro.kpis.rental = formatCount(parseCount(macro.kpis.rental) + amount);
-  }
-  if (type === 'disposable') {
-    macro.kpis.disp = formatCount(parseCount(macro.kpis.disp) + amount);
-  }
-
-  updateShareAndReuse(macro, type, amount);
-  updateCarbon(macro, type, amount);
-  updateStudentKpis(student, type, amount);
-
+  dashboard.updatedAt = now;
   return dashboard;
 };
 
 app.get('/api/dashboard', async (req, res) => {
   try {
-    const dashboard = await ensureSeed();
-    res.json(stripId(dashboard));
+    const [seed, transactions, cupEvents] = await Promise.all([
+      ensureSeedDashboard(),
+      (await getCollection('transactions')).find({}).toArray(),
+      (await getCollection('cup_events')).find({}).toArray()
+    ]);
+
+    const dashboard = deriveDashboardFromSeedAndEvents(stripId(seed), transactions, cupEvents);
+    res.json(dashboard);
   } catch (error) {
     console.error('Failed to load dashboard', error);
     res.status(500).json({ error: 'Failed to load dashboard data.' });
@@ -205,28 +259,57 @@ app.post('/api/transactions', async (req, res) => {
   }
 
   try {
-    const collection = await getCollection();
-    const current = await ensureSeed();
-    const updated = applyTransaction(deepClone(current), normalized);
-    updated.updatedAt = new Date();
+    const transactions = await getCollection('transactions');
+    const doc = {
+      transaction_id: crypto.randomUUID(),
+      ...normalized
+    };
+    await transactions.insertOne(doc);
 
-    await collection.updateOne(
-      { _id: 'dashboard' },
-      {
-        $set: {
-          appData: updated.appData,
-          vendorDrillDownData: updated.vendorDrillDownData,
-          studentData: updated.studentData,
-          updatedAt: updated.updatedAt
-        }
-      }
-    );
+    const [seed, allTx, cupEvents] = await Promise.all([
+      ensureSeedDashboard(),
+      transactions.find({}).toArray(),
+      (await getCollection('cup_events')).find({}).toArray()
+    ]);
 
-    const saved = await collection.findOne({ _id: 'dashboard' });
-    res.json(stripId(saved));
+    const dashboard = deriveDashboardFromSeedAndEvents(stripId(seed), allTx, cupEvents);
+    res.json(dashboard);
   } catch (error) {
-    console.error('Failed to apply transaction', error);
-    res.status(500).json({ error: 'Failed to apply transaction.' });
+    console.error('Failed to record transaction', error);
+    res.status(500).json({ error: 'Failed to record transaction.' });
+  }
+});
+
+app.post('/api/cup-events', async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const event = {
+      event_id: crypto.randomUUID(),
+      timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(),
+      cup_id: payload.cup_id,
+      event_type: payload.event_type,
+      location_id: payload.location_id || null,
+      rental_id: payload.rental_id || null,
+      condition_flag: payload.condition_flag || null,
+      operator_id: payload.operator_id || null
+    };
+
+    if (!event.cup_id) {
+      res.status(400).json({ error: 'cup_id is required.' });
+      return;
+    }
+    if (!event.event_type) {
+      res.status(400).json({ error: 'event_type is required.' });
+      return;
+    }
+
+    const cupEvents = await getCollection('cup_events');
+    await cupEvents.insertOne(event);
+
+    res.status(201).json({ ok: true, event_id: event.event_id });
+  } catch (error) {
+    console.error('Failed to record cup event', error);
+    res.status(500).json({ error: 'Failed to record cup event.' });
   }
 });
 

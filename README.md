@@ -28,14 +28,44 @@ The UI polls `http://localhost:3001/api/dashboard` every 5 seconds. Override wit
 
 ### Postman demo
 
+#### 1. Record a transaction (purchase-level)
+
 `POST http://localhost:3001/api/transactions`
 
 Body (JSON):
 ```
 {
-  "timeframe": "week",
-  "vendor": "Frontier",
-  "type": "byo",
-  "amount": 5
+  "timestamp": "2025-03-01T10:15:00Z",
+  "outlet_id": "Frontier",
+  "stall_id": "Drink Stall 1",
+  "campus_zone": "UTown",
+  "channel": "walk-up",
+  "cup_mode": "rental", // one of: disposable, BYO, rental
+  "drink_category": "cold",
+  "price": 3.5,
+  "disposable_fee_applied": false,
+  "incentive_applied": true,
+  "user_hash": "abc123hash"
 }
 ```
+
+This writes into the `transactions` collection and recomputes the dashboard charts.
+
+#### 2. Record a cup lifecycle event
+
+`POST http://localhost:3001/api/cup-events`
+
+Body (JSON):
+```
+{
+  "timestamp": "2025-03-01T11:05:00Z",
+  "cup_id": "CUP-0001",
+  "event_type": "returned", // issued, returned, collected, washed, redistributed, retired, exception
+  "location_id": "Frontier Drop-off 1",
+  "rental_id": "RENTAL-123",
+  "condition_flag": "ok",
+  "operator_id": "staff-42"
+}
+```
+
+This writes into the `cup_events` collection (ready for deeper operational drill-down).
