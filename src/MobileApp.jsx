@@ -7,25 +7,40 @@ import {
 import { COLORS } from './data.js';
 
 export default function MobileApp({ onBack, data, status }) {
-  const [viewRole, setViewRole] = useState('stakeholder');
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [timeframe, setTimeframe] = useState('week');
 
-  const { appData, vendorDrillDownData, studentData } = data;
+  const { appData, vendorDrillDownData } = data;
   const activeMacro = appData[timeframe];
-  const activeStudent = studentData[timeframe];
   const activeDrillDown = selectedVendor ? vendorDrillDownData[timeframe][selectedVendor] : [];
+  const vendorNames = activeMacro?.vendor?.map((v) => v.name) ?? [];
 
   const lastUpdatedLabel = status?.lastUpdated
     ? new Date(status.lastUpdated).toLocaleTimeString()
     : null;
 
-  const handleVendorClick = (data) => {
-    if (data && data.name) setSelectedVendor(data.name);
+  const resolveVendorName = (value) => {
+    if (!value) return null;
+
+    const candidate = String(value);
+    const exact = vendorNames.find((v) => v.toLowerCase() === candidate.toLowerCase());
+    if (exact) return exact;
+
+    const contained = vendorNames.find((v) => candidate.toLowerCase().includes(v.toLowerCase()));
+    return contained || null;
+  };
+
+  const handleVendorClick = (chartDatum) => {
+    const vendor = resolveVendorName(chartDatum?.payload?.name ?? chartDatum?.name);
+    if (vendor) setSelectedVendor(vendor);
+  };
+
+  const handleVendorFromLocationPress = (location) => {
+    const vendor = resolveVendorName(location);
+    if (vendor) setSelectedVendor(vendor);
   };
 
   const getTitle = () => {
-    if (viewRole === 'student') return 'My Impact Hub';
     if (selectedVendor) return selectedVendor;
     return 'Campus Overview';
   };
@@ -72,9 +87,8 @@ export default function MobileApp({ onBack, data, status }) {
       {/* ── SCROLLABLE CONTENT ── */}
       <main className="flex-1 overflow-y-auto pb-20 px-4 py-4 space-y-4">
 
-        {viewRole === 'stakeholder' ? (
-          <>
-            {!selectedVendor ? (
+        <>
+          {!selectedVendor ? (
 
               /* ── STAKEHOLDER MACRO VIEW ── */
               <>
@@ -202,12 +216,22 @@ export default function MobileApp({ onBack, data, status }) {
                       { name: 'Deck Drink Stall', status: 'Optimal (150 clean)', statusColor: 'text-green-600', action: '--', actionColor: 'text-gray-400 cursor-not-allowed' },
                       { name: 'Techno Edge', status: 'Optimal (110 clean)', statusColor: 'text-green-600', action: '--', actionColor: 'text-gray-400 cursor-not-allowed' },
                     ].map((row) => (
-                      <div key={row.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                      <div
+                        key={row.name}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 active:bg-slate-100 cursor-pointer"
+                        onClick={() => handleVendorFromLocationPress(row.name)}
+                        role="button"
+                        tabIndex={0}
+                        title="Tap to drill down"
+                      >
                         <div>
                           <p className="text-sm font-semibold text-gray-800">{row.name}</p>
                           <p className={`text-xs font-medium ${row.statusColor}`}>{row.status}</p>
                         </div>
-                        <button className={`text-sm font-medium min-h-[44px] px-3 transition-colors ${row.actionColor}`}>
+                        <button
+                          className={`text-sm font-medium min-h-[44px] px-3 transition-colors ${row.actionColor}`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {row.action}
                         </button>
                       </div>
@@ -216,7 +240,7 @@ export default function MobileApp({ onBack, data, status }) {
                 </div>
               </>
 
-            ) : (
+          ) : (
 
               /* ── STAKEHOLDER MICRO (VENDOR DRILL-DOWN) VIEW ── */
               <>
@@ -257,151 +281,18 @@ export default function MobileApp({ onBack, data, status }) {
                   </div>
                 </div>
               </>
-            )}
-          </>
-
-        ) : (
-
-          /* ── STUDENT GAMIFICATION VIEW ── */
-          <>
-            {/* Streak Banner */}
-            <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-4 rounded-xl shadow-md text-white">
-              <h3 className="text-lg font-bold flex items-center">
-                You're on a 5-Day BYO Streak! <span className="text-2xl ml-2 drop-shadow-md">🔥</span>
-              </h3>
-              <p className="text-emerald-50 mt-1 text-sm font-medium">Keep it up! 2 scans away from a free cup wash.</p>
-              <div className="mt-4 bg-white/20 p-3 rounded-lg backdrop-blur-sm border border-white/30">
-                <div className="flex justify-between text-xs mb-2 font-bold uppercase tracking-wide text-white">
-                  <span>Reward Progress</span>
-                  <span>8 / 10 Scans</span>
-                </div>
-                <div className="w-full bg-emerald-900/50 rounded-full h-2.5 border border-emerald-800/50">
-                  <div className="bg-white h-2.5 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)] transition-all duration-1000 ease-out" style={{ width: '80%' }}></div>
-                </div>
-              </div>
-            </div>
-
-            {/* KPI Cards — 1 per row on mobile */}
-            <div className="grid grid-cols-1 gap-3">
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center">
-                <div className="p-3 bg-green-100 text-green-600 rounded-xl mr-4 flex-none">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Money Saved</p>
-                  <p className="text-2xl font-bold text-gray-800">{activeStudent.kpis.saved}</p>
-                  <p className="text-xs text-gray-400 font-medium">From BYO discounts</p>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center">
-                <div className="p-3 bg-blue-100 text-blue-600 rounded-xl mr-4 flex-none">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Washing Credits</p>
-                  <p className="text-2xl font-bold text-gray-800">{activeStudent.kpis.points}</p>
-                  <p className="text-xs text-gray-400 font-medium">Ready to redeem via QR</p>
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center">
-                <div className="p-3 bg-purple-100 text-purple-600 rounded-xl mr-4 flex-none">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cups Diverted</p>
-                  <p className="text-2xl font-bold text-gray-800">{activeStudent.kpis.diverted}</p>
-                  <p className="text-xs text-gray-400 font-medium">Total single-use avoided</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Personal Impact History — Bar chart */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="text-sm font-bold text-gray-800 mb-3 border-b pb-2">
-                My Impact History ({activeStudent.kpis.text})
-              </h3>
-              <div style={{ height: 200 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={activeStudent.chart} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 500 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} />
-                    <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: 11 }} />
-                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ paddingTop: '8px', fontSize: 11 }} />
-                    <Bar dataKey="byo" name="Personal BYO" stackId="a" fill="#22c55e" radius={[0, 0, 4, 4]} barSize={20} />
-                    <Bar dataKey="rental" name="Campus Rental" stackId="a" fill="#3b82f6" barSize={20} />
-                    <Bar dataKey="disposable" name="Single-Use (Oops!)" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={20} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Recent Transactions */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="text-sm font-bold text-gray-800 mb-3 border-b pb-2">Recent Transactions</h3>
-              <div className="space-y-4">
-                <div className="flex items-start">
-                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500 mt-1.5 mr-3 flex-none shadow-[0_0_5px_rgba(59,130,246,0.6)]"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-gray-800">Returned Rental Cup</p>
-                    <p className="text-xs text-gray-500 font-medium">UTown Drop-off • 2 hrs ago</p>
-                  </div>
-                </div>
-                <div className="flex items-start">
-                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500 mt-1.5 mr-3 flex-none"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-gray-800">Checked Out: Rental</p>
-                    <p className="text-xs text-gray-500 font-medium">Frontier Canteen • 4 hrs ago</p>
-                  </div>
-                </div>
-                <div className="flex items-start">
-                  <div className="w-2.5 h-2.5 rounded-full bg-green-500 mt-1.5 mr-3 flex-none shadow-[0_0_5px_rgba(34,197,94,0.6)]"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-gray-800">Checked Out: BYO</p>
-                    <p className="text-xs text-gray-500 font-medium">Deck Drinks • Yesterday</p>
-                  </div>
-                  <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-100 flex-none">-$0.50</span>
-                </div>
-                <div className="flex items-start opacity-60">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-500 mt-1.5 mr-3 flex-none"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-gray-800 line-through decoration-red-400">Checked Out: SUC</p>
-                    <p className="text-xs text-gray-500 font-medium">Techno Edge • Wed</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+          )}
+        </>
       </main>
 
       {/* ── BOTTOM NAVIGATION ── */}
       <nav className="flex-none fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex z-20">
         <button
-          onClick={() => { setViewRole('stakeholder'); setSelectedVendor(null); }}
-          className={`flex-1 flex flex-col items-center justify-center py-3 min-h-[56px] transition-colors ${
-            viewRole === 'stakeholder' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700'
-          }`}
+          onClick={() => setSelectedVendor(null)}
+          className="flex-1 flex flex-col items-center justify-center py-3 min-h-[56px] transition-colors bg-blue-600 text-white"
         >
           <span className="text-lg leading-none">📊</span>
-          <span className="text-xs font-semibold mt-1">Stakeholder</span>
-        </button>
-        <button
-          onClick={() => { setViewRole('student'); setSelectedVendor(null); }}
-          className={`flex-1 flex flex-col items-center justify-center py-3 min-h-[56px] transition-colors ${
-            viewRole === 'student' ? 'bg-green-600 text-white' : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <span className="text-lg leading-none">🎓</span>
-          <span className="text-xs font-semibold mt-1">My Impact</span>
+          <span className="text-xs font-semibold mt-1">Dashboard</span>
         </button>
       </nav>
 
