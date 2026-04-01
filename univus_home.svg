@@ -1,0 +1,242 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" font-family="SF Pro Display, -apple-system, Helvetica Neue, sans-serif">
+
+  <!-- Background -->
+  <rect width="390" height="844" fill="#F2F2F7"/>
+
+  <!-- Status Bar -->
+  <rect width="390" height="44" fill="white"/>
+  <text x="20" y="28" font-size="15" font-weight="600" fill="#000">4:39</text>
+  <!-- Signal bars -->
+  <rect x="310" y="20" width="3" height="8" rx="1" fill="#000"/>
+  <rect x="315" y="17" width="3" height="11" rx="1" fill="#000"/>
+  <rect x="320" y="14" width="3" height="14" rx="1" fill="#000"/>
+  <rect x="325" y="11" width="3" height="17" rx="1" fill="#000"/>
+  <!-- 5G -->
+  <text x="333" y="28" font-size="13" font-weight="700" fill="#000">5G</text>
+  <!-- Battery -->
+  <rect x="354" y="17" width="24" height="12" rx="3" fill="none" stroke="#000" stroke-width="1.2"/>
+  <rect x="378" y="21" width="3" height="4" rx="1" fill="#000"/>
+  <rect x="355.5" y="18.5" width="15" height="9" rx="2" fill="#FF3B30"/>
+  <text x="355" y="28" font-size="9" font-weight="700" fill="white">29</text>
+
+  <!-- Header / Nav Bar -->
+  <rect y="44" width="390" height="56" fill="white"/>
+  <!-- uNivUS logo -->
+  <text x="20" y="72" font-size="22" font-weight="800" fill="#003D9B">u</text>
+  <text x="35" y="72" font-size="22" font-weight="800" fill="#E85D26">N</text>
+  <text x="52" y="72" font-size="22" font-weight="800" fill="#E85D26">iv</text>
+  <text x="72" y="72" font-size="22" font-weight="800" fill="#003D9B">US</text>
+  <text x="20" y="86" font-size="9" fill="#666">Uniting NUS Individuals</text>
+
+  <!-- NUS120 badge -->
+  <rect x="108" y="56" width="82" height="32" rx="6" fill="#F2F2F7"/>
+  <text x="114" y="77" font-size="20" font-weight="800" fill="#E85D26">NUS</text>
+  <text x="152" y="77" font-size="20" font-weight="800" fill="#003D9B">120</text>
+
+  <!-- Search icon (circle with magnifier) -->
+  <circle cx="326" cy="72" r="20" fill="#7B4FBA"/>
+  <circle cx="322" cy="69" r="6" fill="none" stroke="white" stroke-width="2"/>
+  <line x1="326.2" y1="73.2" x2="330" y2="77" stroke="white" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Profile icon -->
+  <circle cx="370" cy="72" r="20" fill="#E85D26"/>
+  <circle cx="370" cy="68" r="6" fill="white"/>
+  <path d="M356 88 Q363 80 370 80 Q377 80 384 88" fill="white"/>
+
+  <!-- Orange Banner -->
+  <rect y="100" width="390" height="90" fill="#E85D26"/>
+  <text x="22" y="135" font-size="28" font-weight="700" fill="white">Hi</text>
+  <text x="22" y="175" font-size="16" font-weight="600" fill="white">Student</text>
+
+  <!-- Scan button -->
+  <rect x="258" y="122" width="54" height="32" rx="16" fill="rgba(255,255,255,0.3)"/>
+  <!-- Scan icon corners -->
+  <path d="M269 130 L265 130 L265 134" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M280 130 L284 130 L284 134" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M269 146 L265 146 L265 142" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M280 146 L284 146 L284 142" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- eCard button -->
+  <rect x="318" y="122" width="58" height="32" rx="16" fill="rgba(255,255,255,0.85)"/>
+  <text x="347" y="142" font-size="13" font-weight="600" fill="#E85D26" text-anchor="middle">eCard</text>
+
+  <!-- Explore Section -->
+  <rect y="190" width="390" height="320" fill="white"/>
+
+  <!-- Explore Header -->
+  <text x="54" y="224" font-size="20" font-weight="700" fill="#1C1C1E">Explore</text>
+  <!-- Compass icon circle -->
+  <circle cx="32" cy="216" r="14" fill="#FFF0E8"/>
+  <circle cx="32" cy="216" r="10" fill="none" stroke="#E85D26" stroke-width="1.5"/>
+  <line x1="32" y1="208" x2="32" y2="210" stroke="#E85D26" stroke-width="1.5" stroke-linecap="round"/>
+  <polygon points="28,212 32,222 36,212" fill="#E85D26" transform="rotate(-45 32 217)"/>
+
+  <!-- + App button -->
+  <rect x="308" y="204" width="66" height="28" rx="14" fill="#E85D26"/>
+  <text x="321" y="222" font-size="18" fill="white" font-weight="300">+</text>
+  <text x="334" y="222" font-size="13" font-weight="500" fill="white">App</text>
+
+  <!-- App Row 1 -->
+  <!-- EduRec -->
+  <rect x="20" y="240" width="64" height="64" rx="14" fill="#FFF8E7"/>
+  <rect x="30" y="248" width="44" height="34" rx="4" fill="#F5C842"/>
+  <rect x="34" y="254" width="20" height="3" rx="1" fill="white"/>
+  <rect x="34" y="260" width="26" height="2" rx="1" fill="white"/>
+  <rect x="34" y="265" width="22" height="2" rx="1" fill="white"/>
+  <path d="M55 250 Q62 254 60 263 Q58 270 52 270" fill="none" stroke="#E85D26" stroke-width="2"/>
+  <text x="52" y="318" font-size="11" fill="#1C1C1E" text-anchor="middle">EduRec</text>
+
+  <!-- NUS Carparks -->
+  <rect x="106" y="240" width="64" height="64" rx="14" fill="#1A3A6B"/>
+  <text x="138" y="275" font-size="30" font-weight="900" fill="white" text-anchor="middle">P</text>
+  <text x="138" y="290" font-size="9" font-weight="600" fill="white" text-anchor="middle">NUS</text>
+  <text x="138" y="318" font-size="11" fill="#1C1C1E" text-anchor="middle">NUS Carparks</text>
+
+  <!-- NUS Hostel Dining -->
+  <rect x="192" y="240" width="64" height="64" rx="14" fill="#2C2C2C"/>
+  <rect x="192" y="240" width="64" height="64" rx="14" fill="#1A1A2E"/>
+  <text x="197" y="261" font-size="8" font-weight="700" fill="#F5C842">NUS</text>
+  <text x="197" y="272" font-size="8" font-weight="700" fill="#F5C842">DINING</text>
+  <!-- Fork and knife icon -->
+  <line x1="214" y1="276" x2="214" y2="295" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M211 276 Q210 282 213 284 Q215 284 216 282 Q218 279 217 276" fill="none" stroke="white" stroke-width="1.5"/>
+  <line x1="221" y1="276" x2="221" y2="295" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M218 276 L224 280 L224 282 L218 284 Z" fill="white"/>
+  <text x="224" y="318" font-size="11" fill="#1C1C1E" text-anchor="middle">NUS Hostel Dining</text>
+
+  <!-- NUS OHS Mobile Key -->
+  <rect x="278" y="240" width="64" height="64" rx="14" fill="#F5F5F5"/>
+  <rect x="288" y="250" width="44" height="30" rx="4" fill="white" stroke="#003D9B" stroke-width="1.5"/>
+  <!-- NUS lion crest simplified -->
+  <text x="310" y="270" font-size="14" font-weight="700" fill="#003D9B" text-anchor="middle">NUS</text>
+  <text x="310" y="318" font-size="11" fill="#1C1C1E" text-anchor="middle">NUS OHS Mobile</text>
+  <text x="310" y="330" font-size="11" fill="#1C1C1E" text-anchor="middle">Key</text>
+
+  <!-- App Row 2 -->
+  <!-- NUSMods -->
+  <rect x="20" y="348" width="64" height="64" rx="14" fill="#FFF0E8"/>
+  <!-- Hexagon M logo -->
+  <polygon points="52,354 62,360 62,372 52,378 42,372 42,360" fill="none" stroke="#E85D26" stroke-width="2.5"/>
+  <text x="52" y="370" font-size="14" font-weight="700" fill="#E85D26" text-anchor="middle">M</text>
+  <text x="52" y="426" font-size="11" fill="#1C1C1E" text-anchor="middle">NUSMods</text>
+
+  <!-- vmock -->
+  <rect x="106" y="348" width="64" height="64" rx="14" fill="#1A1A2E"/>
+  <!-- Abstract colorful logo -->
+  <circle cx="122" cy="368" r="8" fill="#7B4FBA" opacity="0.8"/>
+  <circle cx="132" cy="362" r="8" fill="#E85D26" opacity="0.8"/>
+  <circle cx="142" cy="368" r="8" fill="#003D9B" opacity="0.8"/>
+  <circle cx="132" cy="374" r="8" fill="#00A651" opacity="0.8"/>
+  <text x="134" y="366" font-size="9" font-weight="700" fill="white" text-anchor="middle">vm</text>
+  <text x="138" y="426" font-size="11" fill="#1C1C1E" text-anchor="middle">vmock</text>
+
+  <!-- REBOKS -->
+  <rect x="192" y="348" width="64" height="64" rx="14" fill="#F5A623"/>
+  <text x="224" y="385" font-size="11" font-weight="800" fill="white" text-anchor="middle">REBOKS</text>
+  <text x="224" y="426" font-size="11" fill="#1C1C1E" text-anchor="middle">REBOKS</text>
+
+  <!-- Lost and Found -->
+  <rect x="278" y="348" width="64" height="64" rx="14" fill="#FFF0E8"/>
+  <!-- Bag icon -->
+  <rect x="291" y="362" width="38" height="30" rx="5" fill="#E85D26"/>
+  <path d="M299 362 Q299 354 310 354 Q321 354 321 362" fill="none" stroke="#E85D26" stroke-width="2.5"/>
+  <text x="310" y="380" font-size="18" fill="white" text-anchor="middle">?</text>
+  <text x="310" y="426" font-size="11" fill="#1C1C1E" text-anchor="middle">Lost and Found</text>
+
+  <!-- Pagination dots -->
+  <circle cx="178" cy="445" r="5" fill="#E85D26"/>
+  <rect x="188" y="441" width="30" height="8" rx="4" fill="#D1D1D6"/>
+
+  <!-- Calendar Section -->
+  <rect y="460" width="390" height="230" fill="white" rx="0"/>
+  <rect y="460" width="390" height="1" fill="#E5E5EA"/>
+
+  <!-- Calendar Header -->
+  <circle cx="32" cy="488" r="14" fill="#FFF0E8"/>
+  <!-- Calendar icon -->
+  <rect x="23" y="481" width="18" height="14" rx="2" fill="none" stroke="#E85D26" stroke-width="1.5"/>
+  <line x1="23" y1="486" x2="41" y2="486" stroke="#E85D26" stroke-width="1.5"/>
+  <rect x="27" y="478" width="3" height="6" rx="1.5" fill="#E85D26"/>
+  <rect x="34" y="478" width="3" height="6" rx="1.5" fill="#E85D26"/>
+  <text x="54" y="494" font-size="20" font-weight="700" fill="#1C1C1E">Calendar</text>
+
+  <!-- See More button -->
+  <rect x="296" y="476" width="82" height="28" rx="14" fill="#E85D26"/>
+  <text x="337" y="494" font-size="12" font-weight="500" fill="white" text-anchor="middle">See More &gt;</text>
+
+  <!-- Date Row -->
+  <text x="22" y="530" font-size="22" fill="#003D9B" font-weight="300">&#8249;</text>
+  <text x="100" y="530" font-size="16" font-weight="700" fill="#003D9B" text-anchor="middle">Sun, 29 Mar</text>
+  <text x="178" y="530" font-size="22" fill="#003D9B" font-weight="300">&#8250;</text>
+
+  <!-- Classes and Exams dropdown -->
+  <text x="280" y="530" font-size="14" font-weight="600" fill="#1C1C1E" text-anchor="middle">Classes and Exams</text>
+  <text x="356" y="530" font-size="12" fill="#1C1C1E">&#8964;</text>
+
+  <!-- Semester info -->
+  <text x="22" y="555" font-size="13" font-weight="600" fill="#E85D26">AY 2025/2026 – Sem 2 | Week 10 | Instructional</text>
+
+  <!-- No classes card -->
+  <rect x="16" y="564" width="358" height="52" rx="10" fill="#F9F9F9" stroke="#E5E5EA" stroke-width="1"/>
+  <text x="195" y="594" font-size="14" fill="#3C3C43" text-anchor="middle">You have no classes and exams today.</text>
+
+  <!-- Chat bubble icon -->
+  <circle cx="354" cy="614" r="22" fill="#5856D6"/>
+  <circle cx="348" cy="610" r="8" fill="white" opacity="0.9"/>
+  <circle cx="354" cy="606" r="3" fill="#5856D6"/>
+  <circle cx="360" cy="612" r="3" fill="#5856D6"/>
+  <circle cx="348" cy="616" r="3" fill="#5856D6"/>
+
+  <!-- Bottom Navigation Bar -->
+  <rect y="730" width="390" height="114" fill="white"/>
+  <line x1="0" y1="730" x2="390" y2="730" stroke="#E5E5EA" stroke-width="0.5"/>
+
+  <!-- Home -->
+  <g>
+    <!-- House icon -->
+    <path d="M35 760 L50 748 L65 760 L65 774 L42 774 L42 765 L58 765 L58 774 L65 774" fill="none" stroke="#E85D26" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <rect x="43" y="765" width="14" height="9" rx="1" fill="none" stroke="#E85D26" stroke-width="2"/>
+    <text x="50" y="790" font-size="11" font-weight="600" fill="#E85D26" text-anchor="middle">Home</text>
+  </g>
+
+  <!-- Resources -->
+  <g>
+    <rect x="128" y="748" width="20" height="26" rx="2" fill="none" stroke="#8E8E93" stroke-width="2"/>
+    <line x1="133" y1="755" x2="143" y2="755" stroke="#8E8E93" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="133" y1="760" x2="143" y2="760" stroke="#8E8E93" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="133" y1="765" x2="140" y2="765" stroke="#8E8E93" stroke-width="1.5" stroke-linecap="round"/>
+    <text x="138" y="790" font-size="11" fill="#8E8E93" text-anchor="middle">Resources</text>
+  </g>
+
+  <!-- Inbox (with badge) -->
+  <g>
+    <!-- Envelope icon -->
+    <rect x="182" y="748" width="26" height="20" rx="3" fill="none" stroke="#8E8E93" stroke-width="2"/>
+    <path d="M182 751 L195 761 L208 751" fill="none" stroke="#8E8E93" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Red badge -->
+    <circle cx="208" cy="748" r="7" fill="#FF3B30"/>
+    <text x="208" y="752" font-size="9" font-weight="700" fill="white" text-anchor="middle">3</text>
+    <text x="195" y="790" font-size="11" fill="#8E8E93" text-anchor="middle">Inbox</text>
+  </g>
+
+  <!-- Calendar nav -->
+  <g>
+    <rect x="270" y="748" width="20" height="22" rx="3" fill="none" stroke="#8E8E93" stroke-width="2"/>
+    <line x1="270" y1="755" x2="290" y2="755" stroke="#8E8E93" stroke-width="1.5"/>
+    <rect x="274" y="745" width="3" height="6" rx="1.5" fill="#8E8E93"/>
+    <rect x="283" y="745" width="3" height="6" rx="1.5" fill="#8E8E93"/>
+    <text x="280" y="790" font-size="11" fill="#8E8E93" text-anchor="middle">Calendar</text>
+  </g>
+
+  <!-- Emergency -->
+  <g>
+    <!-- Info circle icon -->
+    <circle cx="354" cy="759" r="11" fill="none" stroke="#8E8E93" stroke-width="2"/>
+    <text x="354" y="763" font-size="13" font-weight="700" fill="#8E8E93" text-anchor="middle">i</text>
+    <text x="354" y="790" font-size="11" fill="#8E8E93" text-anchor="middle">Emergency</text>
+  </g>
+
+  <!-- Home indicator bar -->
+  <rect x="148" y="808" width="94" height="4" rx="2" fill="#000" opacity="0.18"/>
+
+</svg>
