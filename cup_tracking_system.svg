@@ -1,0 +1,199 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="920" viewBox="0 0 390 920" font-family="SF Pro Display, -apple-system, Helvetica Neue, sans-serif">
+
+  <!-- Background -->
+  <rect width="390" height="920" fill="#1C1C1E"/>
+
+  <!-- ───────────────────────────────── -->
+  <!-- ORANGE HEADER SECTION             -->
+  <!-- ───────────────────────────────── -->
+  <rect width="390" height="195" rx="0" fill="#E07B22"/>
+
+  <!-- Title -->
+  <text x="20" y="52" font-size="22" font-weight="700" fill="white">Vendor Cup Tracking System</text>
+  <!-- Gear icon -->
+  <circle cx="368" cy="42" r="11" fill="none" stroke="white" stroke-width="2"/>
+  <circle cx="368" cy="42" r="4" fill="white"/>
+  <line x1="368" y1="28" x2="368" y2="32" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="368" y1="52" x2="368" y2="56" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="354" y1="42" x2="358" y2="42" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="378" y1="42" x2="382" y2="42" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="358" y1="32" x2="361" y2="35" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="375" y1="49" x2="378" y2="52" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="358" y1="52" x2="361" y2="49" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="375" y1="35" x2="378" y2="32" stroke="white" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Vendor Card -->
+  <rect x="14" y="66" width="362" height="80" rx="14" fill="#1B3A6B"/>
+  <!-- UTown logo circle -->
+  <circle cx="58" cy="106" r="26" fill="#E07B22"/>
+  <text x="58" y="112" font-size="13" font-weight="800" fill="#1B3A6B" text-anchor="middle">utown</text>
+  <!-- Vendor name -->
+  <text x="96" y="100" font-size="17" font-weight="700" fill="white">UTown Flavours</text>
+  <!-- Cups Saved badge -->
+  <rect x="96" y="110" width="108" height="22" rx="11" fill="#2E7D52"/>
+  <text x="150" y="125" font-size="12" font-weight="600" fill="white" text-anchor="middle">5.6k Cups Saved</text>
+
+  <!-- ───────────────────────────────── -->
+  <!-- WHITE CONTENT AREA                -->
+  <!-- ───────────────────────────────── -->
+  <rect y="195" width="390" height="672" fill="#F2F2F7"/>
+
+  <!-- Stats Row -->
+  <rect y="195" width="390" height="80" fill="white"/>
+  <!-- Dividers -->
+  <line x1="130" y1="210" x2="130" y2="268" stroke="#E5E5EA" stroke-width="1"/>
+  <line x1="260" y1="210" x2="260" y2="268" stroke="#E5E5EA" stroke-width="1"/>
+
+  <text x="65" y="238" font-size="26" font-weight="700" fill="#E07B22" text-anchor="middle">72</text>
+  <text x="65" y="256" font-size="11" fill="#6B6B6B" text-anchor="middle">Cups Pending</text>
+  <text x="65" y="270" font-size="11" fill="#6B6B6B" text-anchor="middle">Return</text>
+
+  <text x="195" y="238" font-size="26" font-weight="700" fill="#2E7D52" text-anchor="middle">103</text>
+  <text x="195" y="256" font-size="11" fill="#6B6B6B" text-anchor="middle">Cups Returned</text>
+  <text x="195" y="270" font-size="11" fill="#6B6B6B" text-anchor="middle">Today</text>
+
+  <text x="325" y="238" font-size="26" font-weight="700" fill="#1B3A6B" text-anchor="middle">320</text>
+  <text x="325" y="256" font-size="11" fill="#6B6B6B" text-anchor="middle">Cups</text>
+  <text x="325" y="270" font-size="11" fill="#6B6B6B" text-anchor="middle">Available</text>
+
+  <!-- ─── PENDING RETURNS SECTION ─── -->
+  <rect y="282" width="390" height="14" fill="#F2F2F7"/>
+
+  <rect y="296" width="390" height="32" fill="white"/>
+  <text x="16" y="317" font-size="15" font-weight="700" fill="#1C1C1E">Pending Returns</text>
+  <!-- Badge -->
+  <rect x="154" y="303" width="24" height="18" rx="9" fill="#E07B22"/>
+  <text x="166" y="316" font-size="11" font-weight="700" fill="white" text-anchor="middle">72</text>
+  <!-- Subtitle -->
+  <text x="350" y="317" font-size="12" fill="#8E8E93" text-anchor="end">RFID auto-detected</text>
+
+  <!-- ─── Pending Return Cards ─── -->
+
+  <!-- Card 1 — RED (overdue, 3h+) -->
+  <rect y="328" width="390" height="76" fill="white"/>
+  <rect x="0" y="328" width="4" height="76" fill="#FF3B30"/>
+  <!-- Avatar -->
+  <circle cx="38" cy="366" r="18" fill="#E5E5EA"/>
+  <circle cx="38" cy="360" r="7" fill="#AEAEB2"/>
+  <path d="M22 382 Q30 372 38 372 Q46 372 54 382" fill="#AEAEB2"/>
+  <!-- Info -->
+  <text x="68" y="355" font-size="14" font-weight="600" fill="#1C1C1E">User5</text>
+  <text x="68" y="371" font-size="12" fill="#8E8E93">Order #38 · 1x Kopi O (Hot)</text>
+  <!-- Time badge -->
+  <rect x="68" y="378" width="76" height="18" rx="9" fill="#FFE5E5"/>
+  <text x="106" y="391" font-size="11" font-weight="600" fill="#FF3B30" text-anchor="middle">3h 42m ago</text>
+  <!-- Overdue label -->
+  <rect x="292" y="350" width="82" height="22" rx="11" fill="#FF3B30"/>
+  <text x="333" y="365" font-size="11" font-weight="600" fill="white" text-anchor="middle">Overdue</text>
+
+  <line x1="0" y1="404" x2="390" y2="404" stroke="#F2F2F7" stroke-width="1"/>
+
+  <!-- Card 2 — YELLOW (1–3h) -->
+  <rect y="404" width="390" height="76" fill="white"/>
+  <rect x="0" y="404" width="4" height="76" fill="#FF9500"/>
+  <circle cx="38" cy="442" r="18" fill="#E5E5EA"/>
+  <circle cx="38" cy="436" r="7" fill="#AEAEB2"/>
+  <path d="M22 458 Q30 448 38 448 Q46 448 54 458" fill="#AEAEB2"/>
+  <text x="68" y="431" font-size="14" font-weight="600" fill="#1C1C1E">User2</text>
+  <text x="68" y="447" font-size="12" fill="#8E8E93">Order #46 · 2x Teh Tarik, Milo</text>
+  <rect x="68" y="454" width="76" height="18" rx="9" fill="#FFF3E0"/>
+  <text x="106" y="467" font-size="11" font-weight="600" fill="#FF9500" text-anchor="middle">1h 20m ago</text>
+  <rect x="298" y="426" width="76" height="22" rx="11" fill="#FFF3E0" stroke="#FF9500" stroke-width="1"/>
+  <text x="336" y="441" font-size="11" font-weight="600" fill="#FF9500" text-anchor="middle">Due Soon</text>
+
+  <line x1="0" y1="480" x2="390" y2="480" stroke="#F2F2F7" stroke-width="1"/>
+
+  <!-- Card 3 — GREEN (&lt;1h) -->
+  <rect y="480" width="390" height="76" fill="white"/>
+  <rect x="0" y="480" width="4" height="76" fill="#34C759"/>
+  <circle cx="38" cy="518" r="18" fill="#E5E5EA"/>
+  <circle cx="38" cy="512" r="7" fill="#AEAEB2"/>
+  <path d="M22 534 Q30 524 38 524 Q46 524 54 534" fill="#AEAEB2"/>
+  <text x="68" y="507" font-size="14" font-weight="600" fill="#1C1C1E">User3</text>
+  <text x="68" y="523" font-size="12" fill="#8E8E93">Order #47 · 1x Teh O (Hot)</text>
+  <rect x="68" y="530" width="64" height="18" rx="9" fill="#E8F8EC"/>
+  <text x="100" y="543" font-size="11" font-weight="600" fill="#34C759" text-anchor="middle">45m ago</text>
+  <rect x="304" y="502" width="70" height="22" rx="11" fill="#E8F8EC" stroke="#34C759" stroke-width="1"/>
+  <text x="339" y="517" font-size="11" font-weight="600" fill="#2E7D52" text-anchor="middle">On Time</text>
+
+  <line x1="0" y1="556" x2="390" y2="556" stroke="#F2F2F7" stroke-width="1"/>
+
+  <!-- Card 4 — GREEN -->
+  <rect y="556" width="390" height="76" fill="white"/>
+  <rect x="0" y="556" width="4" height="76" fill="#34C759"/>
+  <circle cx="38" cy="594" r="18" fill="#E5E5EA"/>
+  <circle cx="38" cy="588" r="7" fill="#AEAEB2"/>
+  <path d="M22 610 Q30 600 38 600 Q46 600 54 610" fill="#AEAEB2"/>
+  <text x="68" y="583" font-size="14" font-weight="600" fill="#1C1C1E">User7</text>
+  <text x="68" y="599" font-size="12" fill="#8E8E93">Order #49 · 1x Bandung (Ice)</text>
+  <rect x="68" y="606" width="64" height="18" rx="9" fill="#E8F8EC"/>
+  <text x="100" y="619" font-size="11" font-weight="600" fill="#34C759" text-anchor="middle">12m ago</text>
+  <rect x="304" y="578" width="70" height="22" rx="11" fill="#E8F8EC" stroke="#34C759" stroke-width="1"/>
+  <text x="339" y="593" font-size="11" font-weight="600" fill="#2E7D52" text-anchor="middle">On Time</text>
+
+  <!-- ─── RECENT RETURNS SECTION ─── -->
+  <rect y="632" width="390" height="14" fill="#F2F2F7"/>
+
+  <rect y="646" width="390" height="32" fill="white"/>
+  <text x="16" y="667" font-size="15" font-weight="700" fill="#1C1C1E">Recent Returns</text>
+  <text x="374" y="667" font-size="12" fill="#E07B22" text-anchor="end">See All</text>
+
+  <!-- Return row 1 -->
+  <rect y="678" width="390" height="48" fill="white"/>
+  <!-- Green checkmark circle -->
+  <circle cx="32" cy="702" r="14" fill="#E8F8EC"/>
+  <polyline points="25,702 30,708 40,696" fill="none" stroke="#2E7D52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="56" y="697" font-size="13" font-weight="600" fill="#1C1C1E">User1</text>
+  <text x="56" y="713" font-size="12" fill="#8E8E93">Order #45 · 1x Kopi O (Ice)</text>
+  <text x="374" y="697" font-size="12" fill="#8E8E93" text-anchor="end">10m ago</text>
+  <!-- RFID chip icon -->
+  <rect x="326" y="704" width="48" height="16" rx="4" fill="#F2F2F7"/>
+  <text x="350" y="716" font-size="10" fill="#8E8E93" text-anchor="middle">RFID ✓</text>
+  <line x1="0" y1="726" x2="390" y2="726" stroke="#F2F2F7" stroke-width="1"/>
+
+  <!-- Return row 2 -->
+  <rect y="726" width="390" height="48" fill="white"/>
+  <circle cx="32" cy="750" r="14" fill="#E8F8EC"/>
+  <polyline points="25,750 30,756 40,744" fill="none" stroke="#2E7D52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="56" y="745" font-size="13" font-weight="600" fill="#1C1C1E">User4</text>
+  <text x="56" y="761" font-size="12" fill="#8E8E93">Order #43 · 1x Milo Dinosaur</text>
+  <text x="374" y="745" font-size="12" fill="#8E8E93" text-anchor="end">32m ago</text>
+  <rect x="326" y="752" width="48" height="16" rx="4" fill="#F2F2F7"/>
+  <text x="350" y="764" font-size="10" fill="#8E8E93" text-anchor="middle">RFID ✓</text>
+  <line x1="0" y1="774" x2="390" y2="774" stroke="#F2F2F7" stroke-width="1"/>
+
+  <!-- Return row 3 -->
+  <rect y="774" width="390" height="48" fill="white"/>
+  <circle cx="32" cy="798" r="14" fill="#E8F8EC"/>
+  <polyline points="25,798 30,804 40,792" fill="none" stroke="#2E7D52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="56" y="793" font-size="13" font-weight="600" fill="#1C1C1E">User6</text>
+  <text x="56" y="809" font-size="12" fill="#8E8E93">Order #41 · 1x Teh Tarik (Hot)</text>
+  <text x="374" y="793" font-size="12" fill="#8E8E93" text-anchor="end">1h 05m ago</text>
+  <rect x="326" y="800" width="48" height="16" rx="4" fill="#F2F2F7"/>
+  <text x="350" y="812" font-size="10" fill="#8E8E93" text-anchor="middle">RFID ✓</text>
+
+  <!-- ─── BOTTOM NAV ─── -->
+  <rect y="836" width="390" height="84" fill="white"/>
+  <line x1="0" y1="836" x2="390" y2="836" stroke="#E5E5EA" stroke-width="0.5"/>
+
+  <!-- Order Management -->
+  <rect x="26" y="848" width="20" height="20" rx="3" fill="none" stroke="#8E8E93" stroke-width="1.8"/>
+  <line x1="29" y1="856" x2="43" y2="856" stroke="#8E8E93" stroke-width="1.3"/>
+  <line x1="29" y1="860" x2="43" y2="860" stroke="#8E8E93" stroke-width="1.3"/>
+  <line x1="29" y1="864" x2="38" y2="864" stroke="#8E8E93" stroke-width="1.3"/>
+  <text x="36" y="884" font-size="10" fill="#8E8E93" text-anchor="middle">Order Management</text>
+
+  <!-- Cup Tracking System (active) -->
+  <text x="195" y="860" font-size="20" font-weight="300" fill="#E07B22" text-anchor="middle">$</text>
+  <line x1="175" y1="870" x2="215" y2="870" stroke="#E07B22" stroke-width="1.5"/>
+  <text x="195" y="884" font-size="10" font-weight="600" fill="#E07B22" text-anchor="middle">Cup Tracking System</text>
+
+  <!-- Profile -->
+  <circle cx="354" cy="854" r="7" fill="none" stroke="#8E8E93" stroke-width="1.8"/>
+  <path d="M341 874 Q347 864 354 864 Q361 864 367 874" fill="none" stroke="#8E8E93" stroke-width="1.8" stroke-linecap="round"/>
+  <text x="354" y="884" font-size="10" fill="#8E8E93" text-anchor="middle">Profile</text>
+
+  <!-- Home indicator -->
+  <rect x="148" y="906" width="94" height="4" rx="2" fill="#000" opacity="0.18"/>
+
+</svg>
