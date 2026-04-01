@@ -15,15 +15,55 @@ app.use(express.json());
 const client = new MongoClient(MONGODB_URI);
 let dbPromise;
 
+const inMemoryCollections = new Map();
+
+const getInMemoryCollection = (name) => {
+  if (!inMemoryCollections.has(name)) {
+    inMemoryCollections.set(name, []);
+  }
+  const data = inMemoryCollections.get(name);
+
+  return {
+    find: () => ({
+      toArray: async () => deepClone(data)
+    }),
+    findOne: async (filter) => {
+      if (!filter || typeof filter !== 'object') return null;
+      const entries = data.filter((doc) => {
+        return Object.entries(filter).every(([key, value]) => doc?.[key] === value);
+      });
+      return entries.length ? deepClone(entries[0]) : null;
+    },
+    insertOne: async (doc) => {
+      data.push(deepClone(doc));
+      return { acknowledged: true };
+    },
+    insertMany: async (docs) => {
+      for (const doc of docs) {
+        data.push(deepClone(doc));
+      }
+      return { acknowledged: true };
+    }
+  };
+};
+
 const getDb = () => {
   if (!dbPromise) {
-    dbPromise = client.connect().then(() => client.db());
+    dbPromise = client.connect()
+      .then(() => client.db())
+      .catch((error) => {
+        console.warn('MongoDB unavailable; falling back to in-memory store.', error?.message || error);
+        return null;
+      });
   }
   return dbPromise;
 };
 
 const getCollection = async (name) => {
   const db = await getDb();
+  if (!db) {
+    return getInMemoryCollection(name);
+  }
   return db.collection(name);
 };
 
@@ -229,11 +269,53 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
     updateStudentKpis(student, type, amount);
   }
 
-  // Cup lifecycle events could further adjust KPIs later (e.g. returns, wash lag)
-  // For this demo, they are stored for drill-down but not yet altering the top-line charts.
+  const normalizeEventType = (value) => String(value || '').trim().toLowerCase();
+  const mapCupEventToRentalDelta = (eventType) => {
+    const normalized = normalizeEventType(eventType);
+    if (!normalized) return 0;
+
+    // Increase active rentals when a cup is issued/checked out.
+    if (['issued', 'issue', 'rent', 'rented', 'checkout', 'checked_out', 'loaned'].includes(normalized)) return 1;
+
+    // Decrease active rentals when a cup is returned/checked in.
+    if (['returned', 'return', 'checkin', 'checked_in', 'dropoff', 'dropped_off'].includes(normalized)) return -1;
+
+    return 0;
+  };
+
+  for (const event of cupEvents) {
+    const timeframe = classifyTimeframe(new Date(event.timestamp), now);
+    if (!timeframe) continue;
+
+    const macro = dashboard.appData?.[timeframe];
+    if (!macro) continue;
+
+    const delta = mapCupEventToRentalDelta(event.event_type);
+    if (!delta) continue;
+
+    macro.kpis.rental = formatCount(parseCount(macro.kpis.rental) + delta);
+  }
 
   dashboard.updatedAt = now;
   return dashboard;
+};
+
+const numberOrZero = (value) => {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return parsed;
+};
+
+const clampInt = (value, min = 0, max = Number.MAX_SAFE_INTEGER) => {
+  const parsed = Math.trunc(numberOrZero(value));
+  return Math.min(max, Math.max(min, parsed));
+};
+
+const pickRandom = (items) => items[Math.floor(Math.random() * items.length)];
+
+const getSeedVendors = () => {
+  const vendors = seedAppData?.week?.vendor?.map((v) => v.name).filter(Boolean);
+  return vendors?.length ? vendors : ['Frontier'];
 };
 
 app.get('/api/dashboard', async (req, res) => {
@@ -311,6 +393,104 @@ app.post('/api/cup-events', async (req, res) => {
   } catch (error) {
     console.error('Failed to record cup event', error);
     res.status(500).json({ error: 'Failed to record cup event.' });
+  }
+});
+
+// Batch simulation endpoint for driving live dashboard updates.
+// Accepts either explicit counts or a number of random events.
+// Example body:
+// { "random_events": 10, "returns": 3 }
+// or { "byo": 4, "rental": 3, "disposable": 3, "returns": 2 }
+app.post('/api/simulate', async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const randomEvents = clampInt(payload.random_events ?? payload.events ?? 0, 0, 10_000);
+
+    let byo = clampInt(payload.byo ?? 0, 0, 10_000);
+    let rental = clampInt(payload.rental ?? 0, 0, 10_000);
+    let disposable = clampInt(payload.disposable ?? 0, 0, 10_000);
+    const returns = clampInt(payload.returns ?? payload.returned ?? 0, 0, 10_000);
+
+    if (randomEvents > 0) {
+      const modes = ['BYO', 'rental', 'disposable'];
+      for (let i = 0; i < randomEvents; i += 1) {
+        const choice = pickRandom(modes);
+        if (choice === 'BYO') byo += 1;
+        if (choice === 'rental') rental += 1;
+        if (choice === 'disposable') disposable += 1;
+      }
+    }
+
+    const totalTransactions = byo + rental + disposable;
+    if (totalTransactions === 0 && returns === 0) {
+      res.status(400).json({ error: 'Provide at least one transaction event (byo/rental/disposable) or a return.' });
+      return;
+    }
+
+    const vendors = Array.isArray(payload.vendors) && payload.vendors.length
+      ? payload.vendors.map(String)
+      : getSeedVendors();
+    const campusZones = Array.isArray(payload.campus_zones) && payload.campus_zones.length
+      ? payload.campus_zones.map(String)
+      : ['UTown', 'Frontier', 'Deck', 'Techno'];
+
+    const now = new Date();
+
+    const transactionsDocs = [];
+    const addTransactions = (count, cupMode) => {
+      for (let i = 0; i < count; i += 1) {
+        transactionsDocs.push({
+          transaction_id: crypto.randomUUID(),
+          timestamp: now,
+          outlet_id: pickRandom(vendors),
+          stall_id: null,
+          campus_zone: pickRandom(campusZones),
+          channel: 'walk-up',
+          cup_mode: cupMode,
+          drink_category: null,
+          price: null,
+          disposable_fee_applied: null,
+          incentive_applied: null,
+          user_hash: null
+        });
+      }
+    };
+
+    addTransactions(byo, 'BYO');
+    addTransactions(rental, 'rental');
+    addTransactions(disposable, 'disposable');
+
+    const cupEventDocs = [];
+    for (let i = 0; i < returns; i += 1) {
+      const suffix = crypto.randomBytes(3).toString('hex').toUpperCase();
+      cupEventDocs.push({
+        event_id: crypto.randomUUID(),
+        timestamp: now,
+        cup_id: `SIM-CUP-${suffix}`,
+        event_type: 'returned',
+        location_id: null,
+        rental_id: `SIM-RENTAL-${suffix}`,
+        condition_flag: 'ok',
+        operator_id: null
+      });
+    }
+
+    const transactions = await getCollection('transactions');
+    const cupEvents = await getCollection('cup_events');
+    if (transactionsDocs.length) await transactions.insertMany(transactionsDocs);
+    if (cupEventDocs.length) await cupEvents.insertMany(cupEventDocs);
+
+    const [seed, allTx, allEvents] = await Promise.all([
+      ensureSeedDashboard(),
+      transactions.find({}).toArray(),
+      cupEvents.find({}).toArray()
+    ]);
+
+    const dashboard = deriveDashboardFromSeedAndEvents(stripId(seed), allTx, allEvents);
+    res.json(dashboard);
+  } catch (error) {
+    console.error('Failed to simulate events', error);
+    res.status(500).json({ error: 'Failed to simulate events.' });
   }
 });
 

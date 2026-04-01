@@ -19,6 +19,8 @@ If you are developing a production application, we recommend using TypeScript wi
 
 This project now includes a small Express API backed by MongoDB to drive live dashboard updates.
 
+If MongoDB is not reachable (e.g. Atlas TLS / local Mongo not running), the API will automatically fall back to an in-memory store for the current process, so the dashboard + simulator can still run.
+
 ### Option A: Local MongoDB
 1. Start MongoDB locally.
 2. Install dependencies: `npm install`
@@ -32,6 +34,29 @@ This project now includes a small Express API backed by MongoDB to drive live da
 4. Run: `npm install` then `npm run server` and `npm run dev`.
 
 The UI polls `http://localhost:3001/api/dashboard` every 5 seconds. Override with `VITE_API_BASE_URL` if needed.
+
+## Simulation (Python)
+
+If you want the dashboard to update continuously without manually posting events, run the simulator.
+
+1. Start the API and frontend:
+  - `npm run server`
+  - `npm run dev`
+
+2. In a separate terminal, run:
+
+`python scripts/simulate_cups.py --base-url http://localhost:3001`
+
+This will:
+- POST to `POST /api/simulate`
+- Randomly generate cup choices (Campus Rental / BYO / Single-Use)
+- Generate return events that decrement the **Active Rentals** KPI
+
+Tweak the behavior (examples):
+- Faster updates: `python scripts/simulate_cups.py --tick-seconds 0.5`
+- More events per tick: `python scripts/simulate_cups.py --events-per-tick 25`
+- More rentals: `python scripts/simulate_cups.py --p-rental 0.6 --p-byo 0.2 --p-disposable 0.2`
+- More returns: `python scripts/simulate_cups.py --return-prob 0.002`
 
 ### Postman demo
 
@@ -76,3 +101,19 @@ Body (JSON):
 ```
 
 This writes into the `cup_events` collection (ready for deeper operational drill-down).
+
+### Batch simulation endpoint
+
+`POST http://localhost:3001/api/simulate`
+
+Body (JSON) options:
+
+1) Random transactions + returns:
+```
+{ "random_events": 10, "returns": 3 }
+```
+
+2) Explicit counts:
+```
+{ "byo": 4, "rental": 3, "disposable": 3, "returns": 2 }
+```
