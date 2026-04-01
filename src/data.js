@@ -7,11 +7,15 @@ export const appData = {
     // Reuse share recalculated: BYO 2,720 + Rental 1,105 vs Disposable 4,650 → reuse 45%.
     kpis: { reuse: "45.0%", rental: "1,100", disp: "4,650", carbon: "1.2 Tons", trendText: "This Week" },
     trend: [
-      { time: 'Mon', personal: 400, rental: 145, disposable: 1200 },
-      { time: 'Tue', personal: 450, rental: 180, disposable: 1100 },
-      { time: 'Wed', personal: 520, rental: 230, disposable: 950 },
-      { time: 'Thu', personal: 600, rental: 250, disposable: 800 },
-      { time: 'Fri', personal: 750, rental: 300, disposable: 600 },
+      // Per-day totals are fixed at 1,800 cups (personal + rental + disposable).
+      { time: 'Mon', personal: 400, rental: 145, disposable: 1255 },
+      { time: 'Tue', personal: 450, rental: 180, disposable: 1170 },
+      { time: 'Wed', personal: 520, rental: 230, disposable: 1050 },
+      { time: 'Thu', personal: 600, rental: 250, disposable: 950 },
+      { time: 'Fri', personal: 750, rental: 300, disposable: 750 },
+      // Weekend placeholders (filled dynamically; should appear empty when not yet reached).
+      { time: 'Sat', personal: null, rental: null, disposable: null },
+      { time: 'Sun', personal: null, rental: null, disposable: null },
     ],
     vendor: [
       { name: 'Frontier', byo: 320, rental: 125 },

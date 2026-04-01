@@ -1,19 +1,3 @@
-#!/usr/bin/env python3
-"""Simulate ZeroWasteNUS cup usage + rental returns.
-
-This script drives the live dashboard by calling the API endpoint:
-  POST /api/simulate
-
-It generates random cup choices among:
-  - Campus Rental (rental)
-  - BYO (BYO)
-  - Single-Use (disposable)
-
-It also generates return events that reduce the "Active Rentals" KPI.
-
-No third-party Python packages required.
-"""
-
 from __future__ import annotations
 
 import argparse

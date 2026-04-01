@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  AreaChart, Area,
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer,
   BarChart, Bar, Legend, PieChart, Pie, Cell
 } from 'recharts';
@@ -8,7 +9,7 @@ import { COLORS } from './data.js';
 
 export default function MobileApp({ onBack, data, status }) {
   const [selectedVendor, setSelectedVendor] = useState(null);
-  const [timeframe, setTimeframe] = useState('week');
+  const timeframe = 'week';
 
   const { appData, vendorDrillDownData } = data;
   const activeMacro = appData[timeframe];
@@ -67,20 +68,8 @@ export default function MobileApp({ onBack, data, status }) {
           </span>
         </div>
 
-        {/* Timeframe toggle */}
-        <div className="flex bg-slate-700 p-0.5 rounded-lg">
-          <button
-            onClick={() => setTimeframe('week')}
-            className={`px-2 py-1 text-xs rounded-md transition-all font-medium ${timeframe === 'week' ? 'bg-white text-gray-800 shadow-sm' : 'text-slate-300'}`}
-          >
-            Week
-          </button>
-          <button
-            onClick={() => setTimeframe('month')}
-            className={`px-2 py-1 text-xs rounded-md transition-all font-medium ${timeframe === 'month' ? 'bg-white text-gray-800 shadow-sm' : 'text-slate-300'}`}
-          >
-            Month
-          </button>
+        <div className="bg-slate-700 px-2 py-1 rounded-lg text-xs font-medium text-white" aria-label="Timeframe">
+          Week
         </div>
       </header>
 
@@ -123,30 +112,16 @@ export default function MobileApp({ onBack, data, status }) {
                   </h3>
                   <div style={{ height: 200 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={activeMacro.trend} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="mColorDisposable" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                          </linearGradient>
-                          <linearGradient id="mColorReusable" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                          </linearGradient>
-                          <linearGradient id="mColorPersonal" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} />
-                            <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
+                      <LineChart data={activeMacro.trend} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
                         <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                         <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: 11 }} />
                         <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                        <Area type="monotone" dataKey="disposable" name="Single-Use" stroke="#ef4444" strokeWidth={2} fill="url(#mColorDisposable)" />
-                        <Area type="monotone" dataKey="rental" name="Rental" stroke="#3b82f6" strokeWidth={2} fill="url(#mColorReusable)" />
-                        <Area type="monotone" dataKey="personal" name="BYO" stroke="#22c55e" strokeWidth={2} fill="url(#mColorPersonal)" />
-                      </AreaChart>
+                        <Line type="monotone" dataKey="disposable" name="Single-Use" stroke="#ef4444" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="rental" name="Rental" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="personal" name="BYO" stroke="#22c55e" strokeWidth={2} dot={false} />
+                      </LineChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
@@ -255,16 +230,14 @@ export default function MobileApp({ onBack, data, status }) {
                 <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
                   <p className="text-xs font-bold uppercase tracking-wide text-red-500 mb-1">Primary Pain Point</p>
                   <p className="font-semibold text-lg text-red-700">
-                    {timeframe === 'week' ? 'Peak SUC Waste: 12:00 PM' : 'Peak SUC Waste: Fridays'}
+                    Peak SUC Waste: 12:00 PM
                   </p>
                 </div>
 
                 {/* Drill-down area chart */}
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                   <h3 className="text-sm font-bold text-gray-800 mb-1">{selectedVendor} Flow Breakdown</h3>
-                  <p className="text-xs text-gray-500 mb-3">
-                    {timeframe === 'week' ? 'Hourly peak waste analysis' : 'Daily volume consistency'}
-                  </p>
+                  <p className="text-xs text-gray-500 mb-3">Hourly peak waste analysis</p>
                   <div style={{ height: 220 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={activeDrillDown} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>

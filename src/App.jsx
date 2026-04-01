@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import {
   AreaChart,
   Area,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -23,7 +25,7 @@ import MobileApp from './MobileApp.jsx';
 // ==========================================
 export default function ZeroWasteDashboard() {
   const [selectedVendor, setSelectedVendor] = useState(null);
-  const [timeframe, setTimeframe] = useState('week');
+  const timeframe = 'week';
   const [showMobile, setShowMobile] = useState(false);
 
   const { data, status } = useDashboardData();
@@ -91,20 +93,8 @@ export default function ZeroWasteDashboard() {
             {selectedVendor ? `Vendor Logistics: ${selectedVendor}` : 'Campus Sustainability Overview'}
           </h2>
           <div className="flex items-center space-x-4">
-            {/* TIMEFRAME FILTER */}
-            <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
-              <button
-                onClick={() => setTimeframe('week')}
-                className={`px-3 py-1 text-sm rounded-md transition-all ${timeframe === 'week' ? 'bg-white shadow-sm text-gray-800 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                This Week
-              </button>
-              <button
-                onClick={() => setTimeframe('month')}
-                className={`px-3 py-1 text-sm rounded-md transition-all ${timeframe === 'month' ? 'bg-white shadow-sm text-gray-800 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                This Month
-              </button>
+            <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200" aria-label="Timeframe">
+              <span className="px-3 py-1 text-sm rounded-md bg-white shadow-sm text-gray-800 font-semibold">This Week</span>
             </div>
 
             <div
@@ -166,21 +156,7 @@ export default function ZeroWasteDashboard() {
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Campus Adoption Trend ({activeMacro.kpis.trendText})</h3>
                     <div className="h-72 w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={activeMacro.trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="colorDisposable" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                            </linearGradient>
-                            <linearGradient id="colorReusable" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                            </linearGradient>
-                            <linearGradient id="colorPersonal" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} />
-                              <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
+                        <LineChart data={activeMacro.trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                           <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8' }} />
                           <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8' }} />
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -192,10 +168,10 @@ export default function ZeroWasteDashboard() {
                             }}
                           />
                           <Legend iconType="circle" />
-                          <Area type="monotone" dataKey="disposable" name="Single-Use (SUC)" stroke="#ef4444" strokeWidth={2} fill="url(#colorDisposable)" />
-                          <Area type="monotone" dataKey="rental" name="Campus Rental" stroke="#3b82f6" strokeWidth={2} fill="url(#colorReusable)" />
-                          <Area type="monotone" dataKey="personal" name="Personal BYO" stroke="#22c55e" strokeWidth={2} fill="url(#colorPersonal)" />
-                        </AreaChart>
+                          <Line type="monotone" dataKey="disposable" name="Single-Use (SUC)" stroke="#ef4444" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="rental" name="Campus Rental" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="personal" name="Personal BYO" stroke="#22c55e" strokeWidth={2} dot={false} />
+                        </LineChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
@@ -219,6 +195,9 @@ export default function ZeroWasteDashboard() {
                         </span>
                         <span className="flex items-center">
                           <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>Rental
+                        </span>
+                        <span className="flex items-center">
+                          <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>Single-Use
                         </span>
                       </div>
                     </div>
@@ -330,16 +309,12 @@ export default function ZeroWasteDashboard() {
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
                     <div>
                       <h3 className="text-2xl font-bold text-gray-800">{selectedVendor} Flow Breakdown</h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {timeframe === 'week'
-                          ? 'Analyzing specific hourly peak waste times to optimize logistics.'
-                          : 'Analyzing daily volume consistency across the past month.'}
-                      </p>
+                      <p className="text-sm text-gray-500 mt-1">Analyzing specific hourly peak waste times to optimize logistics.</p>
                     </div>
                     <div className="mt-4 md:mt-0 bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm border border-red-100 shadow-inner flex flex-col items-center">
                       <span className="font-bold uppercase tracking-wide text-xs">Primary Pain Point</span>
                       <span className="font-semibold text-lg">
-                        {timeframe === 'week' ? 'Peak SUC Waste: 12:00 PM' : 'Peak SUC Waste: Fridays'}
+                        Peak SUC Waste: 12:00 PM
                       </span>
                     </div>
                   </div>
