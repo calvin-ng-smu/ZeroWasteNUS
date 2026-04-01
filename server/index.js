@@ -258,7 +258,7 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
     studentLast[type] = (studentLast[type] || 0) + amount;
 
     if (type === 'rental') {
-      macro.kpis.rental = formatCount(parseCount(macro.kpis.rental) + amount);
+      macro.kpis.rental = formatCount(Math.min(1800, parseCount(macro.kpis.rental) + amount));
     }
     if (type === 'disposable') {
       macro.kpis.disp = formatCount(parseCount(macro.kpis.disp) + amount);
@@ -293,7 +293,7 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
     const delta = mapCupEventToRentalDelta(event.event_type);
     if (!delta) continue;
 
-    macro.kpis.rental = formatCount(parseCount(macro.kpis.rental) + delta);
+    macro.kpis.rental = formatCount(Math.min(1800, parseCount(macro.kpis.rental) + delta));
   }
 
   dashboard.updatedAt = now;
