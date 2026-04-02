@@ -70,9 +70,10 @@ def post_json(url: str, payload: dict, timeout_seconds: float = 5.0) -> dict:
 
 def build_config(argv: list[str]) -> SimulatorConfig:
     parser = argparse.ArgumentParser(description="Simulate cup rentals/returns and cup-share choices.")
-    parser.add_argument("--base-url", default="http://localhost:3001", help="API base URL")
-    parser.add_argument("--tick-seconds", type=float, default=1.0, help="Seconds between updates")
-    parser.add_argument("--events-per-tick", type=int, default=12, help="How many cup-choice events per tick")
+    parser.add_argument("--base-url", default="http://127.0.0.1:3001", help="API base URL")
+    # Default pacing is intentionally conservative to avoid huge jumps given the UI polls every ~5s.
+    parser.add_argument("--tick-seconds", type=float, default=5.0, help="Seconds between updates")
+    parser.add_argument("--events-per-tick", type=int, default=6, help="How many cup-choice events per tick")
 
     parser.add_argument("--p-rental", type=float, default=0.33, help="Probability of choosing Campus Rental")
     parser.add_argument("--p-byo", type=float, default=0.33, help="Probability of choosing BYO")
@@ -81,19 +82,19 @@ def build_config(argv: list[str]) -> SimulatorConfig:
     parser.add_argument(
         "--initial-active-rentals",
         type=int,
-        default=1850,
-        help="Starting point for local return simulation (UI seed shows 1850)",
+        default=1100,
+        help="Starting point for local return simulation (dashboard seed is ~1100)",
     )
     parser.add_argument(
         "--return-prob",
         type=float,
-        default=0.001,
+        default=0.0017,
         help="Per-tick probability each active rental returns (e.g. 0.001)",
     )
     parser.add_argument(
         "--max-returns-per-tick",
         type=int,
-        default=25,
+        default=15,
         help="Safety cap to avoid huge sudden drops",
     )
 

@@ -3,35 +3,37 @@
 // ==========================================
 export const appData = {
   week: {
-    // Rental ceiling reduced to ~1,100 (fluctuation range 1,000–1,200).
-    // Reuse share recalculated: BYO 2,720 + Rental 1,105 vs Disposable 4,650 → reuse 45%.
-    kpis: { reuse: "45.0%", rental: "1,100", disp: "4,650", carbon: "1.2 Tons", trendText: "This Week" },
+    // Baseline (per day): BYO starts low (~100), rental oscillates (~1,000–1,200), SUC starts high (~2,500).
+    // Reuse share recalculated from trend totals.
+    kpis: { reuse: "34.3%", rental: "1,200", disp: "12,150", carbon: "1.2 Tons", trendText: "This Week", returnCompliance: "92.00%" },
     trend: [
-      // Per-day totals are fixed at 1,800 cups (personal + rental + disposable).
-      { time: 'Mon', personal: 400, rental: 145, disposable: 1255 },
-      { time: 'Tue', personal: 450, rental: 180, disposable: 1170 },
-      { time: 'Wed', personal: 520, rental: 230, disposable: 1050 },
-      { time: 'Thu', personal: 600, rental: 250, disposable: 950 },
-      { time: 'Fri', personal: 750, rental: 300, disposable: 750 },
+      // Per-day totals are ~3,700 cups (personal + rental + disposable).
+      { time: 'Mon', personal: 100, rental: 1100, disposable: 2500 },
+      { time: 'Tue', personal: 120, rental: 1150, disposable: 2430 },
+      { time: 'Wed', personal: 140, rental: 1080, disposable: 2480 },
+      { time: 'Thu', personal: 160, rental: 1200, disposable: 2340 },
+      { time: 'Fri', personal: 180, rental: 1120, disposable: 2400 },
       // Weekend placeholders (filled dynamically; should appear empty when not yet reached).
       { time: 'Sat', personal: null, rental: null, disposable: null },
       { time: 'Sun', personal: null, rental: null, disposable: null },
     ],
     vendor: [
-      { name: 'Frontier', byo: 320, rental: 125 },
-      { name: 'UTown', byo: 450, rental: 225 },
-      { name: 'Deck', byo: 280, rental: 90 },
-      { name: 'Techno', byo: 190, rental: 55 },
+      // Values represent only the 4 displayed foodcourts; remaining demand is spread across 5 other foodcourts not shown.
+      { name: 'Frontier', byo: 83, rental: 667 },
+      { name: 'UTown', byo: 76, rental: 610 },
+      { name: 'Deck', byo: 62, rental: 497 },
+      { name: 'Techno', byo: 55, rental: 441 },
     ],
     share: [
-      { name: 'Personal BYO', value: 32 },
-      { name: 'Campus Rental', value: 13 },
-      { name: 'Single-Use', value: 55 },
+      // Sum of week trend buckets (Mon–Fri in the seed data).
+      { name: 'Personal BYO', value: 700 },
+      { name: 'Campus Rental', value: 5650 },
+      { name: 'Single-Use', value: 12150 },
     ]
   },
   month: {
     // Rental scaled proportionally. Reuse: BYO 9,100 + Rental 3,395 vs Disposable 18,200 → reuse 41%.
-    kpis: { reuse: "41.0%", rental: "4,400", disp: "19,200", carbon: "4.8 Tons", trendText: "This Month" },
+    kpis: { reuse: "40.7%", rental: "3,395", disp: "18,200", carbon: "4.8 Tons", trendText: "This Month", returnCompliance: "92.00%" },
     trend: [
       { time: 'Week 1', personal: 1800, rental: 655, disposable: 5200 },
       { time: 'Week 2', personal: 2100, rental: 775, disposable: 4800 },
@@ -39,15 +41,15 @@ export const appData = {
       { time: 'Week 4', personal: 2800, rental: 1070, disposable: 3900 },
     ],
     vendor: [
-      { name: 'Frontier', byo: 1250, rental: 505 },
-      { name: 'UTown', byo: 1800, rental: 835 },
-      { name: 'Deck', byo: 1100, rental: 355 },
-      { name: 'Techno', byo: 750, rental: 210 },
+      { name: 'Frontier', byo: 1074, rental: 401 },
+      { name: 'UTown', byo: 983, rental: 367 },
+      { name: 'Deck', byo: 801, rental: 299 },
+      { name: 'Techno', byo: 710, rental: 265 },
     ],
     share: [
-      { name: 'Personal BYO', value: 30 },
-      { name: 'Campus Rental', value: 11 },
-      { name: 'Single-Use', value: 59 },
+      { name: 'Personal BYO', value: 9100 },
+      { name: 'Campus Rental', value: 3395 },
+      { name: 'Single-Use', value: 18200 },
     ]
   }
 };

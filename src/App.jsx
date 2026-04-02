@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   AreaChart,
   Area,
@@ -20,6 +20,22 @@ import { COLORS } from './data.js';
 import { useDashboardData } from './useDashboardData.js';
 import MobileApp from './MobileApp.jsx';
 
+const EMPTY_SERIES = Object.freeze([]);
+
+const getSingaporeHour = (date = new Date()) => {
+  try {
+    const formatted = new Intl.DateTimeFormat('en-SG', {
+      timeZone: 'Asia/Singapore',
+      hour: '2-digit',
+      hour12: false,
+    }).format(date);
+    const hour = Number.parseInt(String(formatted), 10);
+    return Number.isFinite(hour) ? hour : date.getHours();
+  } catch {
+    return date.getHours();
+  }
+};
+
 // ==========================================
 // MAIN COMPONENT (STAKEHOLDER ONLY)
 // ==========================================
@@ -27,20 +43,15 @@ export default function ZeroWasteDashboard() {
   const [selectedVendor, setSelectedVendor] = useState(null);
   const timeframe = 'week';
   const [showMobile, setShowMobile] = useState(false);
+  const [selectedVendorDay, setSelectedVendorDay] = useState(null);
 
   const { data, status } = useDashboardData();
   const { appData, vendorDrillDownData } = data;
 
-  if (showMobile) {
-    return (
-      <div className="h-screen">
-        <MobileApp onBack={() => setShowMobile(false)} data={data} status={status} />
-      </div>
-    );
-  }
-
-  const activeMacro = appData[timeframe];
-  const activeDrillDown = selectedVendor ? vendorDrillDownData[timeframe][selectedVendor] : [];
+  const activeMacro = appData?.[timeframe];
+  const activeDrillDown = selectedVendor
+    ? (vendorDrillDownData?.[timeframe]?.[selectedVendor] ?? EMPTY_SERIES)
+    : EMPTY_SERIES;
 
   const lastUpdatedLabel = status.lastUpdated ? new Date(status.lastUpdated).toLocaleTimeString() : null;
 
@@ -60,13 +71,126 @@ export default function ZeroWasteDashboard() {
   // Recharts provides the clicked row category via `payload.name`
   const handleVendorClick = (chartDatum) => {
     const vendor = resolveVendorName(chartDatum?.payload?.name ?? chartDatum?.name);
-    if (vendor) setSelectedVendor(vendor);
+    if (vendor) {
+      setSelectedVendor(vendor);
+      setSelectedVendorDay(null);
+    }
   };
 
   const handleVendorFromLocationClick = (location) => {
     const vendor = resolveVendorName(location);
-    if (vendor) setSelectedVendor(vendor);
+    if (vendor) {
+      setSelectedVendor(vendor);
+      setSelectedVendorDay(null);
+    }
   };
+
+  const distributeByWeights = (total, weights) => {
+    const normalizedTotal = Math.max(0, Math.trunc(Number(total) || 0));
+    const safeWeights = Array.isArray(weights) && weights.length
+      ? weights.map((w) => Math.max(0, Number(w) || 0))
+      : [1];
+    const sum = safeWeights.reduce((acc, w) => acc + w, 0) || 1;
+    const raw = safeWeights.map((w) => (w / sum) * normalizedTotal);
+    const floored = raw.map((v) => Math.floor(v));
+    let remainder = normalizedTotal - floored.reduce((acc, v) => acc + v, 0);
+
+    const order = raw
+      .map((v, idx) => ({ idx, frac: v - Math.floor(v) }))
+      .sort((a, b) => b.frac - a.frac);
+
+    for (let i = 0; i < order.length && remainder > 0; i += 1) {
+      floored[order[i].idx] += 1;
+      remainder -= 1;
+    }
+
+    return floored;
+  };
+
+  const vendorCutoffDayLabel = useMemo(() => {
+    if (!activeDrillDown?.length) return null;
+    for (let i = activeDrillDown.length - 1; i >= 0; i -= 1) {
+      const row = activeDrillDown[i];
+      const hasData = [row?.byo, row?.rental, row?.disposable].some(
+        (v) => v !== null && v !== undefined && Number.isFinite(Number(v))
+      );
+      if (hasData) return row.time;
+    }
+    return null;
+  }, [activeDrillDown]);
+
+  const selectedVendorDayLabel = selectedVendorDay || vendorCutoffDayLabel;
+
+  const selectedVendorDayRow = useMemo(() => {
+    if (!selectedVendorDayLabel || !activeDrillDown?.length) return null;
+    const row = activeDrillDown.find((r) => r.time === selectedVendorDayLabel) || null;
+    if (!row) return null;
+    const hasAny = [row?.byo, row?.rental, row?.disposable].some((v) => v !== null && v !== undefined);
+    return hasAny ? row : null;
+  }, [activeDrillDown, selectedVendorDayLabel]);
+
+  const hourlyVendorSeries = useMemo(() => {
+    const hours = Array.from({ length: 12 }, (_, i) => 8 + i); // 8..19 (8AM..7PM)
+    const labels = hours.map((h) => {
+      const hour12 = ((h + 11) % 12) + 1;
+      const ampm = h < 12 ? 'AM' : 'PM';
+      return `${hour12} ${ampm}`;
+    });
+
+    if (!selectedVendorDayRow) {
+      return labels.map((time) => ({ time, byo: null, rental: null, disposable: null }));
+    }
+
+    const dayByo = Number(selectedVendorDayRow.byo);
+    const dayRental = Number(selectedVendorDayRow.rental);
+    const dayDisposable = Number(selectedVendorDayRow.disposable);
+
+    if (![dayByo, dayRental, dayDisposable].some((v) => Number.isFinite(v))) {
+      return labels.map((time) => ({ time, byo: null, rental: null, disposable: null }));
+    }
+
+    const nowHour = getSingaporeHour();
+    const isToday = selectedVendorDayLabel && selectedVendorDayLabel === vendorCutoffDayLabel;
+    const lastVisibleHour = isToday ? Math.min(19, nowHour) : 19;
+
+    const visibleCount = Math.max(0, Math.min(12, lastVisibleHour - 8 + 1));
+    const baseWeights = [0.04, 0.05, 0.06, 0.07, 0.10, 0.12, 0.13, 0.11, 0.09, 0.08, 0.08, 0.07];
+    const visibleWeights = baseWeights.slice(0, visibleCount);
+
+    const byoSeries = distributeByWeights(dayByo, visibleWeights);
+    const rentalSeries = distributeByWeights(dayRental, visibleWeights);
+    const disposableSeries = distributeByWeights(dayDisposable, visibleWeights);
+
+    return labels.map((time, idx) => {
+      if (idx >= visibleCount) {
+        return { time, byo: null, rental: null, disposable: null };
+      }
+      return {
+        time,
+        byo: byoSeries[idx] ?? 0,
+        rental: rentalSeries[idx] ?? 0,
+        disposable: disposableSeries[idx] ?? 0,
+      };
+    });
+  }, [selectedVendorDayRow, selectedVendorDayLabel, vendorCutoffDayLabel]);
+
+  const peakSUCLabel = useMemo(() => {
+    let best = null;
+    for (const row of hourlyVendorSeries || []) {
+      const value = Number(row?.disposable);
+      if (!Number.isFinite(value)) continue;
+      if (!best || value > best.value) best = { time: row.time, value };
+    }
+    return best?.time ? `${best.time}` : '—';
+  }, [hourlyVendorSeries]);
+
+  if (showMobile) {
+    return (
+      <div className="h-screen">
+        <MobileApp onBack={() => setShowMobile(false)} data={data} status={status} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans overflow-hidden">
@@ -136,12 +260,12 @@ export default function ZeroWasteDashboard() {
                   <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 border-t-4 border-t-blue-500 transition-all">
                     <p className="text-sm font-medium text-gray-500">Active Rental Cups</p>
                     <p className="text-3xl font-bold text-gray-800 mt-1">{activeMacro.kpis.rental}</p>
-                    <p className="text-xs text-blue-600 mt-1 font-medium">92% return compliance</p>
+                    <p className="text-xs text-blue-600 mt-1 font-medium">{activeMacro.kpis.returnCompliance || '0.00%'} return compliance</p>
                   </div>
                   <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 border-t-4 border-t-red-400 transition-all">
                     <p className="text-sm font-medium text-gray-500">Disposables Used</p>
                     <p className="text-3xl font-bold text-gray-800 mt-1">{activeMacro.kpis.disp}</p>
-                    <p className="text-xs text-red-500 mt-1 font-medium">↓ Dropping consistently</p>
+                    <p className="text-xs text-red-500 mt-1 font-medium">Percentage increase slower than last week</p>
                   </div>
                   <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 border-t-4 border-t-purple-500 transition-all">
                     <p className="text-sm font-medium text-gray-500">Est. Carbon Saved</p>
@@ -309,19 +433,25 @@ export default function ZeroWasteDashboard() {
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
                     <div>
                       <h3 className="text-2xl font-bold text-gray-800">{selectedVendor} Flow Breakdown</h3>
-                      <p className="text-sm text-gray-500 mt-1">Analyzing specific hourly peak waste times to optimize logistics.</p>
+                      <p className="text-sm text-gray-500 mt-1">Daily breakdown (This Week)</p>
                     </div>
+
                     <div className="mt-4 md:mt-0 bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm border border-red-100 shadow-inner flex flex-col items-center">
                       <span className="font-bold uppercase tracking-wide text-xs">Primary Pain Point</span>
-                      <span className="font-semibold text-lg">
-                        Peak SUC Waste: 12:00 PM
-                      </span>
+                      <span className="font-semibold text-lg">Peak SUC Waste: {peakSUCLabel}</span>
                     </div>
                   </div>
 
                   <div className="h-96 w-full mt-8">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={activeDrillDown} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <LineChart
+                        data={activeDrillDown}
+                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                        onClick={(e) => {
+                          const label = e?.activeLabel;
+                          if (label) setSelectedVendorDay(label);
+                        }}
+                      >
                         <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontWeight: 500 }} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -333,11 +463,36 @@ export default function ZeroWasteDashboard() {
                           }}
                         />
                         <Legend iconType="circle" verticalAlign="top" height={36} />
-                        <Area type="monotone" dataKey="disposable" name="Single-Use (SUC)" stroke="#ef4444" strokeWidth={3} fillOpacity={0.15} fill="#ef4444" />
-                        <Area type="monotone" dataKey="rental" name="Campus Rental" stroke="#3b82f6" strokeWidth={3} fillOpacity={0.15} fill="#3b82f6" />
-                        <Area type="monotone" dataKey="byo" name="Personal BYO" stroke="#22c55e" strokeWidth={3} fillOpacity={0.15} fill="#22c55e" />
-                      </AreaChart>
+                        <Line type="monotone" dataKey="disposable" name="Single-Use (SUC)" stroke="#ef4444" strokeWidth={3} dot={false} />
+                        <Line type="monotone" dataKey="rental" name="Campus Rental" stroke="#3b82f6" strokeWidth={3} dot={false} />
+                        <Line type="monotone" dataKey="byo" name="Personal BYO" stroke="#22c55e" strokeWidth={3} dot={false} />
+                      </LineChart>
                     </ResponsiveContainer>
+                  </div>
+
+                  <div className="mt-10">
+                    <h4 className="text-lg font-semibold text-gray-800">Hourly Breakdown ({selectedVendorDayLabel || '—'})</h4>
+                    <p className="text-sm text-gray-500 mb-4">8 AM to 8 PM (future hours hidden)</p>
+                    <div className="h-72 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={hourlyVendorSeries} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontWeight: 500 }} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                          <RechartsTooltip
+                            contentStyle={{
+                              borderRadius: '8px',
+                              border: '1px solid #e2e8f0',
+                              boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                            }}
+                          />
+                          <Legend iconType="circle" verticalAlign="top" height={36} />
+                          <Line type="monotone" dataKey="disposable" name="Single-Use (SUC)" stroke="#ef4444" strokeWidth={3} dot={false} />
+                          <Line type="monotone" dataKey="rental" name="Campus Rental" stroke="#3b82f6" strokeWidth={3} dot={false} />
+                          <Line type="monotone" dataKey="byo" name="Personal BYO" stroke="#22c55e" strokeWidth={3} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                 </div>
               </div>

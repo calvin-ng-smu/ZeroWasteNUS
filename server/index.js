@@ -46,6 +46,39 @@ const getInMemoryCollection = (name) => {
         data.push(deepClone(doc));
       }
       return { acknowledged: true };
+    },
+    deleteMany: async () => {
+      data.length = 0;
+      return { acknowledged: true, deletedCount: 0 };
+    },
+    replaceOne: async (filter, replacement) => {
+      if (!filter || typeof filter !== 'object') {
+        data.push(deepClone(replacement));
+        return { acknowledged: true, modifiedCount: 0, upsertedCount: 1 };
+      }
+
+      const index = data.findIndex((doc) => {
+        return Object.entries(filter).every(([key, value]) => doc?.[key] === value);
+      });
+
+      if (index === -1) {
+        data.push(deepClone(replacement));
+        return { acknowledged: true, modifiedCount: 0, upsertedCount: 1 };
+      }
+
+      data[index] = deepClone(replacement);
+      return { acknowledged: true, modifiedCount: 1, upsertedCount: 0 };
+    },
+    updateOne: async (filter, update) => {
+      const index = data.findIndex((doc) => {
+        return Object.entries(filter || {}).every(([key, value]) => doc?.[key] === value);
+      });
+      if (index === -1) {
+        return { acknowledged: true, matchedCount: 0, modifiedCount: 0 };
+      }
+      const set = update?.$set && typeof update.$set === 'object' ? update.$set : {};
+      data[index] = { ...deepClone(data[index]), ...deepClone(set) };
+      return { acknowledged: true, matchedCount: 1, modifiedCount: 1 };
     }
   };
 };
@@ -78,7 +111,10 @@ const deepClone = (value) => {
 };
 
 
+const SEED_VERSION = '2026-04-02-v8';
+
 const buildSeedDashboard = () => ({
+  seedVersion: SEED_VERSION,
   appData: deepClone(seedAppData),
   vendorDrillDownData: deepClone(seedVendorDrillDownData),
   studentData: deepClone(seedStudentData)
@@ -89,13 +125,30 @@ const stripId = ({ _id, ...rest }) => rest;
 const ensureSeedDashboard = async () => {
   const dashboards = await getCollection('dashboards');
   const existing = await dashboards.findOne({ _id: 'seed' });
-  if (existing) return existing;
+
   const seed = {
     _id: 'seed',
     ...buildSeedDashboard(),
     updatedAt: new Date()
   };
-  await dashboards.insertOne(seed);
+
+  // If the seed changes (new baseline), reset stored docs so the UI immediately reflects it.
+  if (existing && existing.seedVersion === SEED_VERSION) {
+    return existing;
+  }
+
+  await dashboards.replaceOne({ _id: 'seed' }, seed, { upsert: true });
+
+  // Clear historical events so the new baseline isn't skewed by old simulation.
+  const transactions = await getCollection('transactions');
+  const cupEvents = await getCollection('cup_events');
+  if (typeof transactions.deleteMany === 'function') {
+    await transactions.deleteMany({});
+  }
+  if (typeof cupEvents.deleteMany === 'function') {
+    await cupEvents.deleteMany({});
+  }
+
   return seed;
 };
 
@@ -140,39 +193,149 @@ const normalizeTransaction = (payload) => {
   };
 };
 
-const ensureShareCounts = (macro) => {
-  if (macro.shareCounts) {
-    return;
-  }
-  const [byo = { value: 0 }, rental = { value: 0 }, disposable = { value: 0 }] = macro.share || [];
+const recomputeShareFromTrend = (macro, cutoffIndex) => {
+  if (!macro?.trend?.length) return;
+
+  const cutoff = clampInt(cutoffIndex ?? (macro.trend.length - 1), 0, macro.trend.length - 1);
+  const totals = macro.trend.reduce(
+    (acc, row, idx) => {
+      if (idx > cutoff) return acc;
+
+      const personal = Number(row.personal);
+      const rental = Number(row.rental);
+      const disposable = Number(row.disposable);
+
+      acc.personal += Number.isFinite(personal) ? personal : 0;
+      acc.rental += Number.isFinite(rental) ? rental : 0;
+      acc.disposable += Number.isFinite(disposable) ? disposable : 0;
+      return acc;
+    },
+    { personal: 0, rental: 0, disposable: 0 }
+  );
+
+  const grand = totals.personal + totals.rental + totals.disposable;
+  if (grand <= 0) return;
+
   macro.shareCounts = {
-    byo: Number(byo.value) || 0,
-    rental: Number(rental.value) || 0,
-    disposable: Number(disposable.value) || 0
+    byo: Math.max(0, Math.round(totals.personal)),
+    rental: Math.max(0, Math.round(totals.rental)),
+    disposable: Math.max(0, Math.round(totals.disposable))
   };
-};
 
-const updateShareAndReuse = (macro, type, amount) => {
-  ensureShareCounts(macro);
-  if (type === 'byo') macro.shareCounts.byo += amount;
-  if (type === 'rental') macro.shareCounts.rental += amount;
-  if (type === 'disposable') macro.shareCounts.disposable += amount;
-
-  const total = macro.shareCounts.byo + macro.shareCounts.rental + macro.shareCounts.disposable;
-  if (total <= 0) return;
-
-  const byoPercent = Math.round((macro.shareCounts.byo / total) * 100);
-  const rentalPercent = Math.round((macro.shareCounts.rental / total) * 100);
-  const disposablePercent = Math.max(0, 100 - byoPercent - rentalPercent);
-
+  // For the donut chart, use summed weekly counts (not percentages).
   macro.share = [
-    { name: 'Personal BYO', value: byoPercent },
-    { name: 'Campus Rental', value: rentalPercent },
-    { name: 'Single-Use', value: disposablePercent }
+    { name: 'Personal BYO', value: macro.shareCounts.byo },
+    { name: 'Campus Rental', value: macro.shareCounts.rental },
+    { name: 'Single-Use', value: macro.shareCounts.disposable }
   ];
 
-  const reusePercent = byoPercent + rentalPercent;
+  const reusePercent = ((totals.personal + totals.rental) / grand) * 100;
   macro.kpis.reuse = `${reusePercent.toFixed(1)}%`;
+};
+
+const setRentalKpiFromTrend = (macro, cutoffIndex) => {
+  if (!macro?.kpis || !Array.isArray(macro.trend) || macro.trend.length === 0) return;
+  const idx = clampInt(cutoffIndex ?? (macro.trend.length - 1), 0, macro.trend.length - 1);
+  const row = macro.trend[idx];
+  const rental = Number(row?.rental);
+  if (!Number.isFinite(rental)) return;
+  macro.kpis.rental = formatCount(rental);
+};
+
+const distributeByWeights = (total, weights) => {
+  const normalizedTotal = clampInt(total, 0, Number.MAX_SAFE_INTEGER);
+  const safeWeights = Array.isArray(weights) && weights.length ? weights.map((w) => Math.max(0, Number(w) || 0)) : [1];
+  const sum = safeWeights.reduce((acc, w) => acc + w, 0) || 1;
+  const raw = safeWeights.map((w) => (w / sum) * normalizedTotal);
+  const floored = raw.map((v) => Math.floor(v));
+  let remainder = normalizedTotal - floored.reduce((acc, v) => acc + v, 0);
+
+  const order = raw
+    .map((v, idx) => ({ idx, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac);
+
+  for (let i = 0; i < order.length && remainder > 0; i += 1) {
+    floored[order[i].idx] += 1;
+    remainder -= 1;
+  }
+
+  return floored;
+};
+
+const recomputeVendorsAndDrillDownFromTrendWeek = (dashboard, macro, cutoffIndex) => {
+  const timeframe = 'week';
+  if (!macro?.trend?.length || !Array.isArray(macro.vendor) || macro.vendor.length === 0) return;
+  if (!dashboard?.vendorDrillDownData?.[timeframe]) return;
+
+  const cutoff = clampInt(cutoffIndex ?? (macro.trend.length - 1), 0, macro.trend.length - 1);
+  const dayLabels = macro.trend.map((row) => row.time).filter(Boolean);
+
+  // Model 9 foodcourts total, even if only 4 are displayed.
+  // IMPORTANT: The 4 displayed vendors should represent <= 40% of campus adoption.
+  // Remaining 60% is attributed to the 5 undisplayed foodcourts.
+  // First 4 weights sum to ~39.2% (slightly under 40%) to keep "<= 40%" true even after integer rounding.
+  const vendorWeights9 = [0.118, 0.108, 0.088, 0.078, 0.135, 0.125, 0.123, 0.112, 0.113];
+  const displayedCount = Math.min(macro.vendor.length, vendorWeights9.length);
+
+  // Build per-vendor daily series from per-day campus totals.
+  const perVendorDaily = {};
+  for (let i = 0; i < displayedCount; i += 1) {
+    const name = macro.vendor[i].name;
+    perVendorDaily[name] = [];
+  }
+
+  for (let dayIdx = 0; dayIdx < macro.trend.length; dayIdx += 1) {
+    const row = macro.trend[dayIdx];
+    const time = dayLabels[dayIdx] || row.time || `Day ${dayIdx + 1}`;
+
+    // Mirror campus chart behavior: buckets after cutoff are empty.
+    if (dayIdx > cutoff) {
+      for (let i = 0; i < displayedCount; i += 1) {
+        perVendorDaily[macro.vendor[i].name].push({ time, byo: null, rental: null, disposable: null });
+      }
+      continue;
+    }
+
+    const campusByo = Number(row.personal);
+    const campusRental = Number(row.rental);
+    const campusDisposable = Number(row.disposable);
+
+    const distributedByo = distributeByWeights(Number.isFinite(campusByo) ? campusByo : 0, vendorWeights9);
+    const distributedRental = distributeByWeights(Number.isFinite(campusRental) ? campusRental : 0, vendorWeights9);
+    const distributedDisposable = distributeByWeights(Number.isFinite(campusDisposable) ? campusDisposable : 0, vendorWeights9);
+
+    for (let i = 0; i < displayedCount; i += 1) {
+      const vendorName = macro.vendor[i].name;
+      perVendorDaily[vendorName].push({
+        time,
+        byo: distributedByo[i] || 0,
+        rental: distributedRental[i] || 0,
+        disposable: distributedDisposable[i] || 0
+      });
+    }
+  }
+
+  // Set vendor adoption totals as sums of the daily series, ensuring consistency.
+  for (let i = 0; i < displayedCount; i += 1) {
+    const vendorName = macro.vendor[i].name;
+    const series = perVendorDaily[vendorName] || [];
+    const sums = series.reduce(
+      (acc, r) => {
+        acc.byo += Number(r.byo) || 0;
+        acc.rental += Number(r.rental) || 0;
+        acc.disposable += Number(r.disposable) || 0;
+        return acc;
+      },
+      { byo: 0, rental: 0, disposable: 0 }
+    );
+
+    macro.vendor[i].byo = Math.round(sums.byo);
+    macro.vendor[i].rental = Math.round(sums.rental);
+    macro.vendor[i].disposable = Math.round(sums.disposable);
+
+    // And publish the drill-down series.
+    dashboard.vendorDrillDownData[timeframe][vendorName] = series;
+  }
 };
 
 const updateCarbon = (macro, type, amount) => {
@@ -207,10 +370,57 @@ const updateStudentKpis = (student, type, amount) => {
   student.kpis.diverted = `${Math.max(0, Math.round(diverted))}`;
 };
 
+const setReturnCompliance = (macro, issuedCount, returnedCount) => {
+  const issued = Math.max(0, Math.trunc(Number(issuedCount) || 0));
+  const returned = Math.max(0, Math.trunc(Number(returnedCount) || 0));
+
+  if (issued <= 0) {
+    macro.kpis.returnCompliance = returned > 0 ? '100.00%' : '0.00%';
+    return;
+  }
+
+  const ratio = returned / issued;
+  const compliance = Math.max(0, Math.min(1, ratio)) * 100;
+  macro.kpis.returnCompliance = `${compliance.toFixed(2)}%`;
+};
+
 const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
   const dashboard = deepClone(seed);
 
-  const WEEKLY_TOTAL_PER_BUCKET = 1800;
+  const SINGAPORE_TIMEZONE = 'Asia/Singapore';
+  const resolveSingaporeHour = (date) => {
+    try {
+      const formatted = new Intl.DateTimeFormat('en-SG', {
+        timeZone: SINGAPORE_TIMEZONE,
+        hour: '2-digit',
+        hour12: false,
+      }).format(date);
+      const hour = Number.parseInt(String(formatted), 10);
+      return Number.isFinite(hour) ? hour : date.getHours();
+    } catch {
+      return date.getHours();
+    }
+  };
+
+  const resolveSingaporeWeekdayIndex = (date) => {
+    try {
+      const weekday = new Intl.DateTimeFormat('en-SG', {
+        timeZone: SINGAPORE_TIMEZONE,
+        weekday: 'short',
+      }).format(date);
+      const map = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+      const idx = map[String(weekday)] ?? null;
+      return Number.isFinite(idx) ? idx : date.getDay();
+    } catch {
+      return date.getDay();
+    }
+  };
+
+  // Total campus drink demand per day (for presentation buckets).
+  // This is intentionally NOT the same as the reusable cup pool size.
+  // Reusable (rental) usage is still capped separately via MAX_REUSABLE_RENTALS.
+  const DAILY_TOTAL_PER_BUCKET = 3700;
+  const MAX_REUSABLE_RENTALS = 1800;
 
   // Presentation mode: by default, behave as if today is Thursday.
   // Override with env var:
@@ -221,7 +431,7 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
     if (!configured) return 4; // Thu
 
     if (String(configured).trim().toLowerCase() === 'actual') {
-      return now.getDay();
+      return resolveSingaporeWeekdayIndex(now);
     }
 
     const parsed = Number(configured);
@@ -244,7 +454,8 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
     const buckets = macro?.trend;
     if (!Array.isArray(buckets) || buckets.length === 0) return 0;
 
-    const day = timestamp instanceof Date ? timestamp.getDay() : new Date(timestamp).getDay();
+    const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    const day = resolveSingaporeWeekdayIndex(date);
     // JS: 0=Sun ... 6=Sat. Our chart buckets are Mon..Fri.
     if (day === 0 || day === 6) return buckets.length - 1;
     return Math.min(buckets.length - 1, Math.max(0, day - 1));
@@ -299,11 +510,14 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
       disposable += Math.max(0, Math.trunc(Number(amount) || 0)) - delta;
     }
 
+    // Enforce reusable cup pool cap.
+    rental = Math.min(MAX_REUSABLE_RENTALS, rental);
+
     // Exact fix-up to guarantee total.
     const reuse = personal + rental;
-    if (reuse >= WEEKLY_TOTAL_PER_BUCKET) {
-      // If reuse exceeds the total, cap it and set SUC to 0.
-      const overflow = reuse - WEEKLY_TOTAL_PER_BUCKET;
+    if (reuse >= DAILY_TOTAL_PER_BUCKET) {
+      // If reuse exceeds the total demand, cap it and set SUC to 0.
+      const overflow = reuse - DAILY_TOTAL_PER_BUCKET;
       // Remove overflow from the bigger reuse bucket first.
       if (personal >= rental) {
         personal = Math.max(0, personal - overflow);
@@ -312,7 +526,7 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
       }
       disposable = 0;
     } else {
-      disposable = WEEKLY_TOTAL_PER_BUCKET - reuse;
+      disposable = DAILY_TOTAL_PER_BUCKET - reuse;
     }
 
     row.personal = personal;
@@ -358,6 +572,9 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
       disposable += total - currentTotal;
     }
 
+    // Enforce reusable cup pool cap.
+    rental = Math.min(MAX_REUSABLE_RENTALS, rental);
+
     row.personal = personal;
     row.rental = rental;
     row.disposable = disposable;
@@ -372,6 +589,30 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
   };
 
   const now = new Date();
+
+  // Time-of-day modeling for "today" (cutoff day).
+  // We assume campus activity window is 8AM–8PM (12 buckets).
+  const ACTIVITY_START_HOUR = 8;
+  const ACTIVITY_END_HOUR_EXCLUSIVE = 20;
+  const ACTIVITY_BUCKETS = ACTIVITY_END_HOUR_EXCLUSIVE - ACTIVITY_START_HOUR; // 12
+
+  const resolveElapsedBucketsToday = () => {
+    const hour = resolveSingaporeHour(now);
+    if (hour < ACTIVITY_START_HOUR) return 0;
+    if (hour >= ACTIVITY_END_HOUR_EXCLUSIVE) return ACTIVITY_BUCKETS;
+    // Include the current hour bucket.
+    return clampInt(hour - ACTIVITY_START_HOUR + 1, 0, ACTIVITY_BUCKETS);
+  };
+
+  // Return compliance should reflect current operations, not be dominated by historical simulation.
+  // Use a rolling window so it converges quickly.
+  const COMPLIANCE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+  const rentalCounters = {
+    week: { issued: 0, returned: 0 },
+    month: { issued: 0, returned: 0 }
+  };
+
   const weeklyMacro = dashboard.appData?.week;
   const weeklyCutoffIndex = weeklyMacro?.trend?.length
     ? resolvePresentationCutoffIndex(now, weeklyMacro.trend.length)
@@ -388,6 +629,9 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
   for (const tx of transactions) {
     const timeframe = classifyTimeframe(new Date(tx.timestamp), now);
     if (!timeframe) continue;
+
+    const txTime = new Date(tx.timestamp);
+    const inComplianceWindow = now - txTime <= COMPLIANCE_WINDOW_MS;
     const type = mapCupModeToType(tx.cup_mode);
     if (!type) continue;
 
@@ -396,20 +640,14 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
     const macro = dashboard.appData?.[timeframe];
     if (!macro) continue;
 
-    const outletName = tx.outlet_id;
-    const vendorMacro = macro.vendor.find((v) => v.name === outletName) || macro.vendor[0];
-    const vendorKey = vendorMacro.name;
-
     const bucketIndex = timeframe === 'week'
       ? clampInt(tx.bucket_index ?? tx.bucketIndex ?? resolveWeeklyBucketIndex(new Date(tx.timestamp), macro), 0, macro.trend.length - 1)
       : macro.trend.length - 1;
     const macroTrend = macro.trend[bucketIndex];
-    const drill = dashboard.vendorDrillDownData?.[timeframe]?.[vendorKey];
-    const drillLast = drill?.[drill.length - 1];
     const student = dashboard.studentData?.[timeframe];
     const studentLast = student?.chart?.[student.chart.length - 1];
 
-    if (!macroTrend || !drillLast || !studentLast) continue;
+    if (!macroTrend || !studentLast) continue;
 
     if (timeframe === 'week') {
       // Ignore future buckets (after the presentation cutoff).
@@ -420,58 +658,20 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
       macroTrend[macroKey] = (macroTrend[macroKey] || 0) + amount;
     }
 
-    if (type === 'byo' || type === 'rental') {
-      vendorMacro[type] = (vendorMacro[type] || 0) + amount;
-    }
-
-    drillLast[type] = (drillLast[type] || 0) + amount;
     studentLast[type] = (studentLast[type] || 0) + amount;
 
     if (type === 'rental') {
+      if (inComplianceWindow && rentalCounters[timeframe]) rentalCounters[timeframe].issued += amount;
       macro.kpis.rental = formatCount(Math.min(1800, parseCount(macro.kpis.rental) + amount));
     }
     if (type === 'disposable') {
       macro.kpis.disp = formatCount(parseCount(macro.kpis.disp) + amount);
     }
 
-    updateShareAndReuse(macro, type, amount);
     updateCarbon(macro, type, amount);
     updateStudentKpis(student, type, amount);
   }
 
-  const recomputeShareFromTrend = (macro, cutoffIndex) => {
-    if (!macro?.trend?.length) return;
-    const cutoff = clampInt(cutoffIndex ?? (macro.trend.length - 1), 0, macro.trend.length - 1);
-    const totals = macro.trend.reduce(
-      (acc, row) => {
-        const idx = acc._idx;
-        acc._idx += 1;
-        if (idx > cutoff) return acc;
-
-        acc.personal += Number(row.personal) || 0;
-        acc.rental += Number(row.rental) || 0;
-        acc.disposable += Number(row.disposable) || 0;
-        return acc;
-      },
-      { personal: 0, rental: 0, disposable: 0, _idx: 0 }
-    );
-
-    const grand = totals.personal + totals.rental + totals.disposable;
-    if (grand <= 0) return;
-
-    const byoPercent = Math.round((totals.personal / grand) * 100);
-    const rentalPercent = Math.round((totals.rental / grand) * 100);
-    const disposablePercent = Math.max(0, 100 - byoPercent - rentalPercent);
-
-    macro.share = [
-      { name: 'Personal BYO', value: byoPercent },
-      { name: 'Campus Rental', value: rentalPercent },
-      { name: 'Single-Use', value: disposablePercent }
-    ];
-
-    const reusePercent = byoPercent + rentalPercent;
-    macro.kpis.reuse = `${reusePercent.toFixed(1)}%`;
-  };
 
   const normalizeEventType = (value) => String(value || '').trim().toLowerCase();
   const mapCupEventToRentalDelta = (eventType) => {
@@ -491,19 +691,28 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
     const timeframe = classifyTimeframe(new Date(event.timestamp), now);
     if (!timeframe) continue;
 
+    const eventTime = new Date(event.timestamp);
+    const inComplianceWindow = now - eventTime <= COMPLIANCE_WINDOW_MS;
+
     const macro = dashboard.appData?.[timeframe];
     if (!macro) continue;
 
     const delta = mapCupEventToRentalDelta(event.event_type);
     if (!delta) continue;
 
-    macro.kpis.rental = formatCount(Math.min(1800, parseCount(macro.kpis.rental) + delta));
+    // Only use returns for compliance. "Active Rental Cups" is derived from the trend bucket.
+    if (inComplianceWindow && delta < 0 && rentalCounters[timeframe]) {
+      rentalCounters[timeframe].returned += Math.abs(delta);
+    }
   }
 
   // Weekly-only UX:
   // - Up to cutoff day: keep each bucket at exactly 1,800 total cups.
   // - After cutoff day: show empty buckets.
   if (weeklyMacro?.trend?.length) {
+    const elapsedBucketsToday = resolveElapsedBucketsToday();
+    const todayTotal = clampInt(Math.round((DAILY_TOTAL_PER_BUCKET * elapsedBucketsToday) / ACTIVITY_BUCKETS), 0, DAILY_TOTAL_PER_BUCKET);
+
     for (let i = 0; i < weeklyMacro.trend.length; i += 1) {
       const row = weeklyMacro.trend[i];
       if (i > weeklyCutoffIndex) {
@@ -512,9 +721,28 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
         row.disposable = null;
         continue;
       }
-      normalizeTrendRowToTotal(row, WEEKLY_TOTAL_PER_BUCKET);
+
+      const targetTotal = i === weeklyCutoffIndex ? todayTotal : DAILY_TOTAL_PER_BUCKET;
+      normalizeTrendRowToTotal(row, targetTotal);
     }
     recomputeShareFromTrend(weeklyMacro, weeklyCutoffIndex);
+    // KPI should reflect the current day's (cutoff bucket) campus rentals.
+    setRentalKpiFromTrend(weeklyMacro, weeklyCutoffIndex);
+    recomputeVendorsAndDrillDownFromTrendWeek(dashboard, weeklyMacro, weeklyCutoffIndex);
+  }
+
+  // Month view: compute share from the full trend series.
+  if (dashboard.appData?.month?.trend?.length) {
+    recomputeShareFromTrend(dashboard.appData.month);
+    setRentalKpiFromTrend(dashboard.appData.month);
+  }
+
+  // Return compliance: returns / rentals issued for the same timeframe.
+  if (dashboard.appData?.week?.kpis) {
+    setReturnCompliance(dashboard.appData.week, rentalCounters.week.issued, rentalCounters.week.returned);
+  }
+  if (dashboard.appData?.month?.kpis) {
+    setReturnCompliance(dashboard.appData.month, rentalCounters.month.issued, rentalCounters.month.returned);
   }
 
   dashboard.updatedAt = now;
@@ -682,13 +910,27 @@ app.post('/api/simulate', async (req, res) => {
 
     const now = new Date();
 
+    const resolveSingaporeWeekdayIndex = (date) => {
+      try {
+        const weekday = new Intl.DateTimeFormat('en-SG', {
+          timeZone: 'Asia/Singapore',
+          weekday: 'short',
+        }).format(date);
+        const map = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+        const idx = map[String(weekday)] ?? null;
+        return Number.isFinite(idx) ? idx : date.getDay();
+      } catch {
+        return date.getDay();
+      }
+    };
+
     // Spread simulated activity across the week buckets up to the presentation cutoff.
     // Default cutoff is Thu (Mon..Thu inclusive).
     const weekTrendLength = seedAppData?.week?.trend?.length || 7;
     const presentationWeekday = (() => {
       const configured = process.env.PRESENTATION_DAY;
       if (!configured) return 4;
-      if (String(configured).trim().toLowerCase() === 'actual') return now.getDay();
+      if (String(configured).trim().toLowerCase() === 'actual') return resolveSingaporeWeekdayIndex(now);
       const parsed = Number(configured);
       if (Number.isFinite(parsed)) return clampInt(parsed, 0, 6);
       return 4;
@@ -766,6 +1008,6 @@ app.post('/api/simulate', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`ZeroWasteNUS API running on http://localhost:${PORT}`);
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`ZeroWasteNUS API running on http://127.0.0.1:${PORT}`);
 });
