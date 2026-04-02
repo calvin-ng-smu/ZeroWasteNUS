@@ -62,12 +62,14 @@ If you want the dashboard to update continuously without manually posting events
   - `npm run dev`
 
 2. In a separate terminal, run (base URL defaults to the API):
-
-`python scripts/simulate_cups.py`
-
-If you started the API on a different port, pass it explicitly (example):
-
-`python scripts/simulate_cups.py --base-url http://127.0.0.1:3002`
+  - Change into the scripts folder:
+    - `cd scripts`
+  - Run the simulator:
+    - macOS / Linux: `python3 simulate_cups.py --base-url http://localhost:3001`
+    - Windows: `python simulate_cups.py --base-url http://localhost:3001`
+    - If `localhost` fails on Windows, use IPv4 explicitly: `--base-url http://127.0.0.1:3001`
+  - If you started the API on a different port, pass it explicitly (example):
+    - `python simulate_cups.py --base-url http://127.0.0.1:3002`
 
 This will:
 - POST to `POST /api/simulate`
@@ -75,10 +77,10 @@ This will:
 - Generate return events that decrement the **Active Rentals** KPI
 
 Tweak the behavior (examples):
-- Faster updates: `python scripts/simulate_cups.py --tick-seconds 0.5`
-- More events per tick: `python scripts/simulate_cups.py --events-per-tick 25`
-- More rentals: `python scripts/simulate_cups.py --p-rental 0.6 --p-byo 0.2 --p-disposable 0.2`
-- More returns: `python scripts/simulate_cups.py --return-prob 0.002`
+- Faster updates: `python simulate_cups.py --tick-seconds 0.5`
+- More events per tick: `python simulate_cups.py --events-per-tick 25`
+- More rentals: `python simulate_cups.py --p-rental 0.6 --p-byo 0.2 --p-disposable 0.2`
+- More returns: `python simulate_cups.py --return-prob 0.002`
 
 ### Postman demo
 

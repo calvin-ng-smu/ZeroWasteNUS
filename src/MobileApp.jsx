@@ -185,7 +185,9 @@ export default function MobileApp({ onBack, data, status }) {
     const CRITICAL_STOCK = 40;
     const LOW_STOCK = 90;
     const HIGH_RETURNED_TODAY = 8;
-    const BIN_CAPACITY_HINT = 10;
+    const BIN_CAPACITY = 65;
+    const BIN_AMBER_AT = 50;
+    const BIN_RED_AT = 60;
 
     const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 
@@ -206,11 +208,17 @@ export default function MobileApp({ onBack, data, status }) {
       }
 
       if (returnedToday >= HIGH_RETURNED_TODAY) {
-        const percent = clamp(Math.round((returnedToday / BIN_CAPACITY_HINT) * 100), 10, 100);
+        const percent = clamp(Math.round((returnedToday / BIN_CAPACITY) * 100), 0, 100);
+        const statusColor =
+          returnedToday >= BIN_RED_AT
+            ? 'text-red-500'
+            : returnedToday >= BIN_AMBER_AT
+              ? 'text-yellow-600'
+              : 'text-green-600';
         return {
           name,
-          status: `Drop-off Bin ${percent}% Full (${returnedToday} returned)`,
-          statusColor: 'text-yellow-600',
+          status: `Drop-off Bin ${percent}% Full (${returnedToday}/${BIN_CAPACITY} returned)`,
+          statusColor,
           action: 'Collect',
           actionColor: 'text-blue-600 hover:text-blue-800',
         };
