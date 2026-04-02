@@ -1,19 +1,36 @@
-# React + Vite
+# ZeroWasteNUS Dashboard (React + Vite + Express)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This repository contains:
+- A React (Vite) dashboard UI
+- A small Express API (`/api/dashboard`, `/api/simulate`, etc.) that provides live data
+- An optional Python simulator that generates transactions/returns
 
-Currently, two official plugins are available:
+## Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 18+ (recommended: latest LTS)
+- npm
+- (Optional) Python 3.9+ for the simulator
+- (Optional) MongoDB (local or Atlas). If MongoDB is not reachable, the API falls back to an in-memory store automatically.
 
-## React Compiler
+## Quick Start (works without MongoDB)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1) Install dependencies (required):
 
-## Expanding the ESLint configuration
+`npm install`
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+2) Terminal A — start the API:
+
+`npm run server`
+
+3) Terminal B — start the frontend:
+
+`npm run dev`
+
+4) Open the UI (Vite will print the URL; typically `http://localhost:5173`).
+
+Notes (Windows):
+- The API binds to `127.0.0.1:3001`.
+- This project defaults to `http://127.0.0.1:3001` (IPv4 loopback) to avoid Windows `localhost` IPv6 issues.
 
 ## Live API (MongoDB)
 
@@ -23,9 +40,9 @@ If MongoDB is not reachable (e.g. Atlas TLS / local Mongo not running), the API 
 
 ### Option A: Local MongoDB
 1. Start MongoDB locally.
-2. Install dependencies: `npm install`
-3. Run the API: `npm run server`
-4. Run the frontend: `npm run dev`
+2. `npm install`
+3. `npm run server`
+4. `npm run dev`
 
 ### Option B: MongoDB Atlas (recommended for multi-device)
 1. Create a free Atlas cluster and user.
@@ -33,7 +50,8 @@ If MongoDB is not reachable (e.g. Atlas TLS / local Mongo not running), the API 
 3. Paste your Atlas connection string into `MONGODB_URI` in `.env`.
 4. Run: `npm install` then `npm run server` and `npm run dev`.
 
-The UI polls `http://localhost:3001/api/dashboard` every 5 seconds. Override with `VITE_API_BASE_URL` if needed.
+The UI polls `http://127.0.0.1:3001/api/dashboard` every 5 seconds.
+Override with `VITE_API_BASE_URL` if needed (example: `VITE_API_BASE_URL=http://127.0.0.1:3001`).
 
 ## Simulation (Python)
 
@@ -43,9 +61,13 @@ If you want the dashboard to update continuously without manually posting events
   - `npm run server`
   - `npm run dev`
 
-2. In a separate terminal, run:
+2. In a separate terminal, run (base URL defaults to the API):
 
-`python scripts/simulate_cups.py --base-url http://localhost:3001`
+`python scripts/simulate_cups.py`
+
+If you started the API on a different port, pass it explicitly (example):
+
+`python scripts/simulate_cups.py --base-url http://127.0.0.1:3002`
 
 This will:
 - POST to `POST /api/simulate`
@@ -62,7 +84,7 @@ Tweak the behavior (examples):
 
 #### 1. Record a transaction (purchase-level)
 
-`POST http://localhost:3001/api/transactions`
+`POST http://127.0.0.1:3001/api/transactions`
 
 Body (JSON):
 ```
@@ -85,7 +107,7 @@ This writes into the `transactions` collection and recomputes the dashboard char
 
 #### 2. Record a cup lifecycle event
 
-`POST http://localhost:3001/api/cup-events`
+`POST http://127.0.0.1:3001/api/cup-events`
 
 Body (JSON):
 ```
@@ -104,7 +126,7 @@ This writes into the `cup_events` collection (ready for deeper operational drill
 
 ### Batch simulation endpoint
 
-`POST http://localhost:3001/api/simulate`
+`POST http://127.0.0.1:3001/api/simulate`
 
 Body (JSON) options:
 
@@ -117,3 +139,19 @@ Body (JSON) options:
 ```
 { "byo": 4, "rental": 3, "disposable": 3, "returns": 2 }
 ```
+
+## Troubleshooting
+
+- `Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'dotenv' ...`
+  - You have not installed dependencies yet.
+  - Fix: run `npm install` from the repo root, then retry `npm run server`.
+
+- `EADDRINUSE` / port already in use
+  - Something is already using port 3001.
+  - Fix: stop the other process, or start the API on another port:
+    - PowerShell: `$env:PORT=3002; npm run server`
+    - Then set `VITE_API_BASE_URL=http://127.0.0.1:3002` before `npm run dev`.
+
+- Mongo connection warnings / TLS issues
+  - This is expected if MongoDB isn"t configured.
+  - The API will fall back to an in-memory store so the demo still runs.
