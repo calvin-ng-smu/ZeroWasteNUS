@@ -17,6 +17,7 @@ const client = new MongoClient(MONGODB_URI, {
   connectTimeoutMS: 1500
 });
 let dbPromise;
+let mongoDisabled = false;
 
 const inMemoryCollections = new Map();
 
@@ -84,11 +85,15 @@ const getInMemoryCollection = (name) => {
 };
 
 const getDb = () => {
+  if (mongoDisabled) {
+    return Promise.resolve(null);
+  }
   if (!dbPromise) {
     dbPromise = client.connect()
       .then(() => client.db())
       .catch((error) => {
         console.warn('MongoDB unavailable; falling back to in-memory store.', error?.message || error);
+        mongoDisabled = true;
         return null;
       });
   }
@@ -97,10 +102,86 @@ const getDb = () => {
 
 const getCollection = async (name) => {
   const db = await getDb();
-  if (!db) {
-    return getInMemoryCollection(name);
+  const memory = getInMemoryCollection(name);
+  if (!db || mongoDisabled) {
+    return memory;
   }
-  return db.collection(name);
+
+  const mongo = db.collection(name);
+  const disableMongoAndFallback = (error) => {
+    mongoDisabled = true;
+    dbPromise = null;
+    console.warn('MongoDB operation failed; switching to in-memory store.', error?.message || error);
+  };
+
+  return {
+    find: (...args) => {
+      try {
+        const cursor = mongo.find(...args);
+        return {
+          toArray: async () => {
+            try {
+              return await cursor.toArray();
+            } catch (error) {
+              disableMongoAndFallback(error);
+              return await memory.find(...args).toArray();
+            }
+          }
+        };
+      } catch (error) {
+        disableMongoAndFallback(error);
+        return memory.find(...args);
+      }
+    },
+    findOne: async (...args) => {
+      try {
+        return await mongo.findOne(...args);
+      } catch (error) {
+        disableMongoAndFallback(error);
+        return await memory.findOne(...args);
+      }
+    },
+    insertOne: async (...args) => {
+      try {
+        return await mongo.insertOne(...args);
+      } catch (error) {
+        disableMongoAndFallback(error);
+        return await memory.insertOne(...args);
+      }
+    },
+    insertMany: async (...args) => {
+      try {
+        return await mongo.insertMany(...args);
+      } catch (error) {
+        disableMongoAndFallback(error);
+        return await memory.insertMany(...args);
+      }
+    },
+    deleteMany: async (...args) => {
+      try {
+        return await mongo.deleteMany(...args);
+      } catch (error) {
+        disableMongoAndFallback(error);
+        return await memory.deleteMany(...args);
+      }
+    },
+    replaceOne: async (...args) => {
+      try {
+        return await mongo.replaceOne(...args);
+      } catch (error) {
+        disableMongoAndFallback(error);
+        return await memory.replaceOne(...args);
+      }
+    },
+    updateOne: async (...args) => {
+      try {
+        return await mongo.updateOne(...args);
+      } catch (error) {
+        disableMongoAndFallback(error);
+        return await memory.updateOne(...args);
+      }
+    },
+  };
 };
 
 const deepClone = (value) => {
@@ -388,6 +469,10 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
   const dashboard = deepClone(seed);
 
   const SINGAPORE_TIMEZONE = 'Asia/Singapore';
+  const RESUPPLY_CAPACITY_PER_FOODCOURT = 200;
+  const WASH_DURATION_MS = 2 * 60 * 60 * 1000;
+  const TRANSIT_BACK_MS = 1 * 60 * 60 * 1000;
+
   const resolveSingaporeHour = (date) => {
     try {
       const formatted = new Intl.DateTimeFormat('en-SG', {
@@ -415,6 +500,7 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
       return date.getDay();
     }
   };
+
 
   // Total campus drink demand per day (for presentation buckets).
   // This is intentionally NOT the same as the reusable cup pool size.
@@ -618,6 +704,89 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
     ? resolvePresentationCutoffIndex(now, weeklyMacro.trend.length)
     : 0;
 
+  // ----------------------------------------------
+  // Foodcourt logistics (today): partition 200 cups
+  // ----------------------------------------------
+  const foodcourtNames = Array.isArray(seedAppData?.week?.vendor)
+    ? seedAppData.week.vendor.map((v) => v?.name).filter(Boolean)
+    : [];
+  const foodcourts = foodcourtNames.length ? foodcourtNames : ['Frontier', 'UTown', 'Deck', 'Techno'];
+
+  const totalIssuedByFoodcourt = Object.fromEntries(foodcourts.map((name) => [name, 0]));
+  const totalReturnedByFoodcourt = Object.fromEntries(foodcourts.map((name) => [name, 0]));
+  const inWashByFoodcourt = Object.fromEntries(foodcourts.map((name) => [name, 0]));
+  const comingBackByFoodcourt = Object.fromEntries(foodcourts.map((name) => [name, 0]));
+
+  const normalizeEventTypeLocal = (value) => String(value || '').trim().toLowerCase();
+
+  for (const tx of transactions) {
+    if (!tx) continue;
+    const outlet = String(tx.outlet_id || '').trim();
+    if (!outlet || !(outlet in totalIssuedByFoodcourt)) continue;
+    if (tx.cup_mode !== 'rental') continue;
+
+    const amount = Math.max(1, Math.trunc(Number(tx.amount) || 1));
+    totalIssuedByFoodcourt[outlet] += amount;
+  }
+
+  for (const event of cupEvents) {
+    if (!event) continue;
+
+    const normalized = normalizeEventTypeLocal(event.event_type);
+    const isReturn = ['returned', 'return', 'checkin', 'checked_in', 'dropoff', 'dropped_off'].includes(normalized);
+    if (!isReturn) continue;
+
+    const location = String(event.location_id || '').trim();
+    if (!location || !(location in totalReturnedByFoodcourt)) continue;
+
+    const ts = event.timestamp ? new Date(event.timestamp) : null;
+    if (!ts || Number.isNaN(ts.getTime())) continue;
+
+    totalReturnedByFoodcourt[location] += 1;
+
+    const ageMs = now - ts;
+    if (ageMs < WASH_DURATION_MS) {
+      inWashByFoodcourt[location] += 1;
+    } else if (ageMs < WASH_DURATION_MS + TRANSIT_BACK_MS) {
+      comingBackByFoodcourt[location] += 1;
+    }
+  }
+
+  const todayLabel = weeklyMacro?.trend?.[weeklyCutoffIndex]?.time || null;
+  dashboard.foodcourtLogistics = {
+    todayLabel,
+    capacity: RESUPPLY_CAPACITY_PER_FOODCOURT,
+    rows: foodcourts.map((name) => {
+      const issuedAll = Math.max(0, Math.trunc(Number(totalIssuedByFoodcourt[name]) || 0));
+      const returnedAll = Math.max(0, Math.trunc(Number(totalReturnedByFoodcourt[name]) || 0));
+
+      let rentedOut = Math.max(0, issuedAll - returnedAll);
+      let returnedPending = Math.max(0, Math.trunc(Number(inWashByFoodcourt[name]) || 0));
+      let comingBack = Math.max(0, Math.trunc(Number(comingBackByFoodcourt[name]) || 0));
+
+      // Ensure the 4 parts sum to at most 200.
+      const cap = RESUPPLY_CAPACITY_PER_FOODCOURT;
+      if (returnedPending + comingBack > cap) {
+        returnedPending = Math.min(returnedPending, cap);
+        comingBack = Math.max(0, cap - returnedPending);
+      }
+
+      if (rentedOut > cap - returnedPending - comingBack) {
+        rentedOut = Math.max(0, cap - returnedPending - comingBack);
+      }
+
+      const inStock = cap - rentedOut - returnedPending - comingBack;
+
+      return {
+        name,
+        returnedToday: returnedPending,
+        rentedOut,
+        comingBack,
+        inStock: Math.max(0, inStock),
+      };
+    })
+  };
+
   const mapCupModeToType = (cupMode) => {
     if (!cupMode) return null;
     if (cupMode === 'BYO') return 'byo';
@@ -713,6 +882,33 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
     const elapsedBucketsToday = resolveElapsedBucketsToday();
     const todayTotal = clampInt(Math.round((DAILY_TOTAL_PER_BUCKET * elapsedBucketsToday) / ACTIVITY_BUCKETS), 0, DAILY_TOTAL_PER_BUCKET);
 
+    const distributeProportionally = (total, parts) => {
+      const safeTotal = Math.max(0, Math.trunc(Number(total) || 0));
+      const safeParts = Array.isArray(parts)
+        ? parts.map((p) => Math.max(0, Math.trunc(Number(p) || 0)))
+        : [];
+      const sum = safeParts.reduce((acc, p) => acc + p, 0);
+      if (!safeParts.length) return [];
+      if (sum <= 0) {
+        const base = new Array(safeParts.length).fill(0);
+        base[base.length - 1] = safeTotal;
+        return base;
+      }
+
+      const raw = safeParts.map((p) => (safeTotal * p) / sum);
+      const floored = raw.map((v) => Math.floor(v));
+      let remainder = safeTotal - floored.reduce((acc, v) => acc + v, 0);
+      const order = raw
+        .map((v, idx) => ({ idx, frac: v - Math.floor(v) }))
+        .sort((a, b) => b.frac - a.frac);
+
+      for (let i = 0; i < order.length && remainder > 0; i += 1) {
+        floored[order[i].idx] += 1;
+        remainder -= 1;
+      }
+      return floored;
+    };
+
     for (let i = 0; i < weeklyMacro.trend.length; i += 1) {
       const row = weeklyMacro.trend[i];
       if (i > weeklyCutoffIndex) {
@@ -722,8 +918,22 @@ const deriveDashboardFromSeedAndEvents = (seed, transactions, cupEvents) => {
         continue;
       }
 
-      const targetTotal = i === weeklyCutoffIndex ? todayTotal : DAILY_TOTAL_PER_BUCKET;
-      normalizeTrendRowToTotal(row, targetTotal);
+      if (i === weeklyCutoffIndex) {
+        // First, ensure the cutoff day represents a full-day baseline.
+        normalizeTrendRowToTotal(row, DAILY_TOTAL_PER_BUCKET);
+
+        // Then, allocate the partial-day total proportionally across the 3 modes.
+        const [personal, rental, disposable] = distributeProportionally(todayTotal, [row.personal, row.rental, row.disposable]);
+
+        let cappedRental = Math.min(MAX_REUSABLE_RENTALS, rental);
+        let disposableAdjusted = disposable + (rental - cappedRental);
+
+        row.personal = personal;
+        row.rental = cappedRental;
+        row.disposable = Math.max(0, disposableAdjusted);
+      } else {
+        normalizeTrendRowToTotal(row, DAILY_TOTAL_PER_BUCKET);
+      }
     }
     recomputeShareFromTrend(weeklyMacro, weeklyCutoffIndex);
     // KPI should reflect the current day's (cutoff bucket) campus rentals.
@@ -883,7 +1093,7 @@ app.post('/api/simulate', async (req, res) => {
     let byo = clampInt(payload.byo ?? 0, 0, 10_000);
     let rental = clampInt(payload.rental ?? 0, 0, 10_000);
     let disposable = clampInt(payload.disposable ?? 0, 0, 10_000);
-    const returns = clampInt(payload.returns ?? payload.returned ?? 0, 0, 10_000);
+    const requestedReturns = clampInt(payload.returns ?? payload.returned ?? 0, 0, 10_000);
 
     if (randomEvents > 0) {
       const modes = ['BYO', 'rental', 'disposable'];
@@ -896,7 +1106,7 @@ app.post('/api/simulate', async (req, res) => {
     }
 
     const totalTransactions = byo + rental + disposable;
-    if (totalTransactions === 0 && returns === 0) {
+    if (totalTransactions === 0 && requestedReturns === 0) {
       res.status(400).json({ error: 'Provide at least one transaction event (byo/rental/disposable) or a return.' });
       return;
     }
@@ -974,23 +1184,78 @@ app.post('/api/simulate', async (req, res) => {
     addBatchedTransactions(rental, 'rental');
     addBatchedTransactions(disposable, 'disposable');
 
-    const cupEventDocs = [];
-    for (let i = 0; i < returns; i += 1) {
-      const suffix = crypto.randomBytes(3).toString('hex').toUpperCase();
-      cupEventDocs.push({
-        event_id: crypto.randomUUID(),
-        timestamp: now,
-        cup_id: `SIM-CUP-${suffix}`,
-        event_type: 'returned',
-        location_id: null,
-        rental_id: `SIM-RENTAL-${suffix}`,
-        condition_flag: 'ok',
-        operator_id: null
-      });
-    }
-
+    // Ensure simulated returns don't exceed currently-rented-out cups.
+    // This keeps the logistics box consistent (carryover rentals from yesterday included).
     const transactions = await getCollection('transactions');
     const cupEvents = await getCollection('cup_events');
+
+    const [existingTx, existingEvents] = await Promise.all([
+      transactions.find({}).toArray(),
+      cupEvents.find({}).toArray()
+    ]);
+
+    const issuedByVendor = Object.fromEntries(vendors.map((v) => [v, 0]));
+    const returnedByVendor = Object.fromEntries(vendors.map((v) => [v, 0]));
+
+    for (const tx of existingTx) {
+      if (!tx || tx.cup_mode !== 'rental') continue;
+      const outlet = String(tx.outlet_id || '').trim();
+      if (!outlet || !(outlet in issuedByVendor)) continue;
+      const amount = Math.max(1, Math.trunc(Number(tx.amount) || 1));
+      issuedByVendor[outlet] += amount;
+    }
+
+    const normalizeEventTypeLocal = (value) => String(value || '').trim().toLowerCase();
+    const isReturnEvent = (eventType) => {
+      const normalized = normalizeEventTypeLocal(eventType);
+      return ['returned', 'return', 'checkin', 'checked_in', 'dropoff', 'dropped_off'].includes(normalized);
+    };
+
+    for (const event of existingEvents) {
+      if (!event || !isReturnEvent(event.event_type)) continue;
+      const location = String(event.location_id || '').trim();
+      if (!location || !(location in returnedByVendor)) continue;
+      returnedByVendor[location] += 1;
+    }
+
+    const issuedThisRequestByVendor = Object.fromEntries(vendors.map((v) => [v, 0]));
+    for (const doc of transactionsDocs) {
+      if (!doc || doc.cup_mode !== 'rental') continue;
+      const outlet = String(doc.outlet_id || '').trim();
+      if (!outlet || !(outlet in issuedThisRequestByVendor)) continue;
+      const amount = Math.max(1, Math.trunc(Number(doc.amount) || 1));
+      issuedThisRequestByVendor[outlet] += amount;
+    }
+
+    const maxReturnableByVendor = vendors.map((vendor) => {
+      const issued = Math.max(0, Math.trunc(Number(issuedByVendor[vendor]) || 0));
+      const returned = Math.max(0, Math.trunc(Number(returnedByVendor[vendor]) || 0));
+      const outstanding = Math.max(0, issued - returned);
+      const plusNew = Math.max(0, Math.trunc(Number(issuedThisRequestByVendor[vendor]) || 0));
+      return outstanding + plusNew;
+    });
+
+    const totalReturnable = maxReturnableByVendor.reduce((acc, v) => acc + v, 0);
+    const effectiveReturns = Math.min(requestedReturns, totalReturnable);
+    const returnsPerVendor = distributeByWeights(effectiveReturns, maxReturnableByVendor);
+
+    const cupEventDocs = [];
+    for (let vendorIndex = 0; vendorIndex < vendors.length; vendorIndex += 1) {
+      const count = Math.max(0, Math.trunc(Number(returnsPerVendor[vendorIndex]) || 0));
+      for (let i = 0; i < count; i += 1) {
+        const suffix = crypto.randomBytes(3).toString('hex').toUpperCase();
+        cupEventDocs.push({
+          event_id: crypto.randomUUID(),
+          timestamp: now,
+          cup_id: `SIM-CUP-${suffix}`,
+          event_type: 'returned',
+          location_id: vendors[vendorIndex],
+          rental_id: `SIM-RENTAL-${suffix}`,
+          condition_flag: 'ok',
+          operator_id: null
+        });
+      }
+    }
     if (transactionsDocs.length) await transactions.insertMany(transactionsDocs);
     if (cupEventDocs.length) await cupEvents.insertMany(cupEventDocs);
 
@@ -1004,7 +1269,10 @@ app.post('/api/simulate', async (req, res) => {
     res.json(dashboard);
   } catch (error) {
     console.error('Failed to simulate events', error);
-    res.status(500).json({ error: 'Failed to simulate events.' });
+    res.status(500).json({
+      error: 'Failed to simulate events.',
+      details: error?.message || String(error)
+    });
   }
 });
 

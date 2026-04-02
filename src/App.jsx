@@ -19,6 +19,7 @@ import {
 import { COLORS } from './data.js';
 import { useDashboardData } from './useDashboardData.js';
 import MobileApp from './MobileApp.jsx';
+import { deriveFoodcourtLogistics } from './deriveFoodcourtLogistics.js';
 
 const EMPTY_SERIES = Object.freeze([]);
 
@@ -46,7 +47,7 @@ export default function ZeroWasteDashboard() {
   const [selectedVendorDay, setSelectedVendorDay] = useState(null);
 
   const { data, status } = useDashboardData();
-  const { appData, vendorDrillDownData } = data;
+  const { appData, vendorDrillDownData, foodcourtLogistics } = data;
 
   const activeMacro = appData?.[timeframe];
   const activeDrillDown = selectedVendor
@@ -183,6 +184,83 @@ export default function ZeroWasteDashboard() {
     }
     return best?.time ? `${best.time}` : '—';
   }, [hourlyVendorSeries]);
+
+  const tiedFoodcourtLogistics = useMemo(() => {
+    const derived = deriveFoodcourtLogistics({
+      weekMacro: activeMacro,
+      vendorDrillDownWeek: vendorDrillDownData?.[timeframe],
+      now: new Date(),
+      capacity: foodcourtLogistics?.capacity ?? 200,
+    });
+
+    return derived || foodcourtLogistics || null;
+  }, [activeMacro, vendorDrillDownData, timeframe, foodcourtLogistics]);
+
+  const liveLogisticsRows = useMemo(() => {
+    const labelMap = {
+      Frontier: 'Frontier Canteen',
+      UTown: 'UTown Fine Food',
+      Deck: 'Deck Drink Stall',
+      Techno: 'Techno Edge',
+    };
+
+    const rows = tiedFoodcourtLogistics?.rows || [];
+    if (!rows.length) return [];
+
+    const CRITICAL_STOCK = 40;
+    const LOW_STOCK = 90;
+    const HIGH_RETURNED_TODAY = 8;
+    const BIN_CAPACITY_HINT = 10;
+
+    const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+
+    return rows.map((r) => {
+      const name = labelMap[r.name] || r.name;
+      const returnedToday = Math.max(0, Math.trunc(Number(r.returnedToday) || 0));
+      const rentedOut = Math.max(0, Math.trunc(Number(r.rentedOut) || 0));
+      const inStock = Math.max(0, Math.trunc(Number(r.inStock) || 0));
+
+      // Priority: critical stock > high returns (bin fullness) > normal stock tiers.
+      if (inStock <= CRITICAL_STOCK) {
+        return {
+          name,
+          status: `Low Clean Cups (${inStock} clean, ${rentedOut} out)`,
+          statusClass: 'text-red-500 font-medium',
+          action: 'Dispatch',
+          actionClass: 'text-blue-600 hover:text-blue-800 font-medium transition-colors',
+        };
+      }
+
+      if (returnedToday >= HIGH_RETURNED_TODAY) {
+        const percent = clamp(Math.round((returnedToday / BIN_CAPACITY_HINT) * 100), 10, 100);
+        return {
+          name,
+          status: `Return Point ${percent}% Full (${returnedToday} returned)`,
+          statusClass: 'text-yellow-600 font-medium',
+          action: 'Collect',
+          actionClass: 'text-blue-600 hover:text-blue-800 font-medium transition-colors',
+        };
+      }
+
+      if (inStock <= LOW_STOCK) {
+        return {
+          name,
+          status: `Monitor Clean Cups (${inStock} clean, ${rentedOut} out)`,
+          statusClass: 'text-yellow-600 font-medium',
+          action: 'Dispatch',
+          actionClass: 'text-blue-600 hover:text-blue-800 font-medium transition-colors',
+        };
+      }
+
+      return {
+        name,
+        status: `Optimal (${inStock} clean)`,
+        statusClass: 'text-green-600 font-medium',
+        action: '--',
+        actionClass: 'text-gray-400 cursor-not-allowed',
+      };
+    });
+  }, [tiedFoodcourtLogistics]);
 
   if (showMobile) {
     return (
@@ -367,53 +445,71 @@ export default function ZeroWasteDashboard() {
                           </tr>
                         </thead>
                         <tbody>
-                          <tr
-                            className="border-b border-gray-50 cursor-pointer hover:bg-slate-50"
-                            onClick={() => handleVendorFromLocationClick('Frontier Canteen')}
-                            title="Click to drill down into Frontier"
-                          >
-                            <td className="px-4 py-3 font-medium text-gray-800">Frontier Canteen</td>
-                            <td className="px-4 py-3 text-red-500 font-medium">Low Clean Cups (12 left)</td>
-                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                              <button className="text-blue-600 hover:text-blue-800 font-medium transition-colors">Dispatch</button>
-                            </td>
-                          </tr>
-                          <tr
-                            className="border-b border-gray-50 cursor-pointer hover:bg-slate-50"
-                            onClick={() => handleVendorFromLocationClick('UTown Fine Food')}
-                            title="Click to drill down into UTown"
-                          >
-                            <td className="px-4 py-3 font-medium text-gray-800">UTown Fine Food</td>
-                            <td className="px-4 py-3 text-yellow-600 font-medium">Drop-off Bin 80% Full</td>
-                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                              <button className="text-blue-600 hover:text-blue-800 font-medium transition-colors">Collect</button>
-                            </td>
-                          </tr>
-                          <tr
-                            className="border-b border-gray-50 cursor-pointer hover:bg-slate-50"
-                            onClick={() => handleVendorFromLocationClick('Deck Drink Stall')}
-                            title="Click to drill down into Deck"
-                          >
-                            <td className="px-4 py-3 font-medium text-gray-800">Deck Drink Stall</td>
-                            <td className="px-4 py-3 text-green-600 font-medium">Optimal (150 clean)</td>
-                            <td className="px-4 py-3">
-                              <button className="text-gray-400 cursor-not-allowed">--</button>
-                            </td>
-                          </tr>
-                          <tr
-                            className="border-b border-gray-50 cursor-pointer hover:bg-slate-50"
-                            onClick={() => handleVendorFromLocationClick('Techno Edge')}
-                            title="Click to drill down into Techno"
-                          >
-                            <td className="px-4 py-3 font-medium text-gray-800">Techno Edge</td>
-                            <td className="px-4 py-3 text-green-600 font-medium">Optimal (110 clean)</td>
-                            <td className="px-4 py-3">
-                              <button className="text-gray-400 cursor-not-allowed">--</button>
-                            </td>
-                          </tr>
+                          {(liveLogisticsRows.length ? liveLogisticsRows : [
+                            {
+                              name: 'Frontier Canteen',
+                              status: '—',
+                              statusClass: 'text-gray-400 font-medium',
+                              action: '--',
+                              actionClass: 'text-gray-400 cursor-not-allowed',
+                            },
+                          ]).map((row) => (
+                            <tr
+                              key={row.name}
+                              className="border-b border-gray-50 cursor-pointer hover:bg-slate-50"
+                              onClick={() => handleVendorFromLocationClick(row.name)}
+                              title="Click to drill down"
+                            >
+                              <td className="px-4 py-3 font-medium text-gray-800">{row.name}</td>
+                              <td className={`px-4 py-3 ${row.statusClass}`}>{row.status}</td>
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <button className={row.actionClass}>{row.action}</button>
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                  <div className="flex justify-between items-center mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800">Reusable Cup Logistics (Today)</h3>
+                      <p className="text-xs text-gray-500">Per foodcourt pool is capped at {tiedFoodcourtLogistics?.capacity ?? 200}</p>
+                    </div>
+                    <span className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-full border border-slate-200">
+                      {tiedFoodcourtLogistics?.todayLabel ? `${tiedFoodcourtLogistics.todayLabel}` : '—'}
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-xs text-gray-500 uppercase bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 rounded-tl-lg">Foodcourt</th>
+                          <th className="px-4 py-2">Returned Today</th>
+                          <th className="px-4 py-2">Rented Out</th>
+                          <th className="px-4 py-2 rounded-tr-lg">In Stock</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(tiedFoodcourtLogistics?.rows || []).map((row) => (
+                          <tr key={row.name} className="border-b border-gray-50">
+                            <td className="px-4 py-3 font-medium text-gray-800">{row.name}</td>
+                            <td className="px-4 py-3 text-slate-700">{row.returnedToday}</td>
+                            <td className="px-4 py-3 text-slate-700">{row.rentedOut}</td>
+                            <td className="px-4 py-3 font-semibold text-gray-900">{row.inStock}</td>
+                          </tr>
+                        ))}
+                        {!tiedFoodcourtLogistics?.rows?.length ? (
+                          <tr>
+                            <td className="px-4 py-3 text-gray-500" colSpan={4}>No logistics data available.</td>
+                          </tr>
+                        ) : null}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </>

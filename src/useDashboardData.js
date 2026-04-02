@@ -4,7 +4,8 @@ import { appData, vendorDrillDownData, studentData } from './data.js';
 const DEFAULT_DATA = {
   appData,
   vendorDrillDownData,
-  studentData
+  studentData,
+  foodcourtLogistics: null,
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3001';
@@ -32,7 +33,8 @@ export const useDashboardData = () => {
         setData({
           appData: payload.appData,
           vendorDrillDownData: payload.vendorDrillDownData,
-          studentData: payload.studentData
+          studentData: payload.studentData,
+          foodcourtLogistics: payload.foodcourtLogistics ?? null,
         });
         setStatus({
           loading: false,

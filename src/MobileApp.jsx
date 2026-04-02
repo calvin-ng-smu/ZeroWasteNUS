@@ -5,6 +5,7 @@ import {
   BarChart, Bar, Legend, PieChart, Pie, Cell
 } from 'recharts';
 import { COLORS } from './data.js';
+import { deriveFoodcourtLogistics } from './deriveFoodcourtLogistics.js';
 
 const EMPTY_SERIES = Object.freeze([]);
 
@@ -27,7 +28,7 @@ export default function MobileApp({ onBack, data, status }) {
   const [selectedVendorDay, setSelectedVendorDay] = useState(null);
   const timeframe = 'week';
 
-  const { appData, vendorDrillDownData } = data;
+  const { appData, vendorDrillDownData, foodcourtLogistics } = data;
   const activeMacro = appData[timeframe];
   const activeDrillDown = selectedVendor
     ? (vendorDrillDownData?.[timeframe]?.[selectedVendor] ?? EMPTY_SERIES)
@@ -158,6 +159,82 @@ export default function MobileApp({ onBack, data, status }) {
     }
     return best?.time ? `${best.time}` : '—';
   }, [hourlyVendorSeries]);
+
+  const tiedFoodcourtLogistics = useMemo(() => {
+    const derived = deriveFoodcourtLogistics({
+      weekMacro: activeMacro,
+      vendorDrillDownWeek: vendorDrillDownData?.[timeframe],
+      now: new Date(),
+      capacity: foodcourtLogistics?.capacity ?? 200,
+    });
+
+    return derived || foodcourtLogistics || null;
+  }, [activeMacro, vendorDrillDownData, timeframe, foodcourtLogistics]);
+
+  const liveLogisticsRows = useMemo(() => {
+    const labelMap = {
+      Frontier: 'Frontier Canteen',
+      UTown: 'UTown Fine Food',
+      Deck: 'Deck Drink Stall',
+      Techno: 'Techno Edge',
+    };
+
+    const rows = tiedFoodcourtLogistics?.rows || [];
+    if (!rows.length) return [];
+
+    const CRITICAL_STOCK = 40;
+    const LOW_STOCK = 90;
+    const HIGH_RETURNED_TODAY = 8;
+    const BIN_CAPACITY_HINT = 10;
+
+    const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+
+    return rows.map((r) => {
+      const name = labelMap[r.name] || r.name;
+      const returnedToday = Math.max(0, Math.trunc(Number(r.returnedToday) || 0));
+      const rentedOut = Math.max(0, Math.trunc(Number(r.rentedOut) || 0));
+      const inStock = Math.max(0, Math.trunc(Number(r.inStock) || 0));
+
+      if (inStock <= CRITICAL_STOCK) {
+        return {
+          name,
+          status: `Low Clean Cups (${inStock} clean, ${rentedOut} out)`,
+          statusColor: 'text-red-500',
+          action: 'Dispatch',
+          actionColor: 'text-blue-600 hover:text-blue-800',
+        };
+      }
+
+      if (returnedToday >= HIGH_RETURNED_TODAY) {
+        const percent = clamp(Math.round((returnedToday / BIN_CAPACITY_HINT) * 100), 10, 100);
+        return {
+          name,
+          status: `Drop-off Bin ${percent}% Full (${returnedToday} returned)`,
+          statusColor: 'text-yellow-600',
+          action: 'Collect',
+          actionColor: 'text-blue-600 hover:text-blue-800',
+        };
+      }
+
+      if (inStock <= LOW_STOCK) {
+        return {
+          name,
+          status: `Monitor Clean Cups (${inStock} clean, ${rentedOut} out)`,
+          statusColor: 'text-yellow-600',
+          action: 'Dispatch',
+          actionColor: 'text-blue-600 hover:text-blue-800',
+        };
+      }
+
+      return {
+        name,
+        status: `Optimal (${inStock} clean)`,
+        statusColor: 'text-green-600',
+        action: '--',
+        actionColor: 'text-gray-400 cursor-not-allowed',
+      };
+    });
+  }, [tiedFoodcourtLogistics]);
 
   const getTitle = () => {
     if (selectedVendor) return selectedVendor;
@@ -303,12 +380,9 @@ export default function MobileApp({ onBack, data, status }) {
                     </span>
                   </div>
                   <div className="space-y-2">
-                    {[
-                      { name: 'Frontier Canteen', status: 'Low Clean Cups (12 left)', statusColor: 'text-red-500', action: 'Dispatch', actionColor: 'text-blue-600 hover:text-blue-800' },
-                      { name: 'UTown Fine Food', status: 'Drop-off Bin 80% Full', statusColor: 'text-yellow-600', action: 'Collect', actionColor: 'text-blue-600 hover:text-blue-800' },
-                      { name: 'Deck Drink Stall', status: 'Optimal (150 clean)', statusColor: 'text-green-600', action: '--', actionColor: 'text-gray-400 cursor-not-allowed' },
-                      { name: 'Techno Edge', status: 'Optimal (110 clean)', statusColor: 'text-green-600', action: '--', actionColor: 'text-gray-400 cursor-not-allowed' },
-                    ].map((row) => (
+                    {(liveLogisticsRows.length ? liveLogisticsRows : [
+                      { name: 'Frontier Canteen', status: '—', statusColor: 'text-gray-400', action: '--', actionColor: 'text-gray-400 cursor-not-allowed' },
+                    ]).map((row) => (
                       <div
                         key={row.name}
                         className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 active:bg-slate-100 cursor-pointer"
@@ -329,6 +403,46 @@ export default function MobileApp({ onBack, data, status }) {
                         </button>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-800">Reusable Cup Logistics (Today)</h3>
+                      <p className="text-[10px] text-gray-500">Per foodcourt pool capped at {tiedFoodcourtLogistics?.capacity ?? 200}</p>
+                    </div>
+                    <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full border border-slate-200">
+                      {tiedFoodcourtLogistics?.todayLabel || '—'}
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="text-[10px] text-gray-500 uppercase bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 rounded-tl-lg">Foodcourt</th>
+                          <th className="px-3 py-2">Returned</th>
+                          <th className="px-3 py-2">Rented</th>
+                          <th className="px-3 py-2 rounded-tr-lg">Stock</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(tiedFoodcourtLogistics?.rows || []).map((row) => (
+                          <tr key={row.name} className="border-b border-gray-50">
+                            <td className="px-3 py-2 font-semibold text-gray-800">{row.name}</td>
+                            <td className="px-3 py-2 text-slate-700">{row.returnedToday}</td>
+                            <td className="px-3 py-2 text-slate-700">{row.rentedOut}</td>
+                            <td className="px-3 py-2 font-bold text-gray-900">{row.inStock}</td>
+                          </tr>
+                        ))}
+                        {!tiedFoodcourtLogistics?.rows?.length ? (
+                          <tr>
+                            <td className="px-3 py-2 text-gray-500" colSpan={4}>No logistics data available.</td>
+                          </tr>
+                        ) : null}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </>
